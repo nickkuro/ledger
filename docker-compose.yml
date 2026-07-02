@@ -1,21 +1,28 @@
-services:
-  ledger:
-    build: .
-    image: ledger-discord:latest
-    container_name: ledger
-    restart: unless-stopped
-    ports:
-      - "${HOST_PORT:-3000}:3000"
-    environment:
-      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
-      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
-      - DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
-      - SESSION_SECRET=${SESSION_SECRET}
-      - ALLOWED_DISCORD_IDS=${ALLOWED_DISCORD_IDS:-}
-      - NODE_ENV=production
-      - PORT=3000
-    volumes:
-      - ledger_data:/app/data
+# Copy this file to .env and fill in real values. Never commit the real .env file.
 
-volumes:
-  ledger_data:
+# From the Discord Developer Portal > your application > OAuth2
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+
+# Must exactly match a redirect registered in the Discord Developer Portal,
+# including http vs https. Example for local testing:
+#   DISCORD_REDIRECT_URI=http://localhost:3000/auth/discord/callback
+# Example once deployed:
+#   DISCORD_REDIRECT_URI=https://notes.yourdomain.com/auth/discord/callback
+DISCORD_REDIRECT_URI=http://localhost:3000/auth/discord/callback
+
+# Any long random string, used to sign session cookies.
+# Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+SESSION_SECRET=
+
+# Optional. Comma-separated Discord user IDs allowed to log in.
+# Leave blank to let any Discord account log in.
+# Find a user ID by enabling Developer Mode in Discord (User Settings > Advanced),
+# then right-click a person > Copy User ID.
+ALLOWED_DISCORD_IDS=
+
+# Optional, defaults to 3000
+PORT=3000
+
+# Set to "production" when deployed behind HTTPS so session cookies require it
+NODE_ENV=development

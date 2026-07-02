@@ -1,18 +1,21 @@
-{
-  "name": "ledger-discord",
-  "version": "1.0.0",
-  "description": "Ledger notes app with Discord login, self-hosted",
-  "type": "commonjs",
-  "engines": {
-    "node": ">=18"
-  },
-  "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
-  },
-  "dependencies": {
-    "express": "^4.19.2",
-    "express-session": "^1.18.0",
-    "dotenv": "^16.4.5"
-  }
-}
+services:
+  ledger:
+    build: .
+    image: ledger-discord:latest
+    container_name: ledger
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ALLOWED_DISCORD_IDS=${ALLOWED_DISCORD_IDS:-}
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - ledger_data:/app/data
+
+volumes:
+  ledger_data:
