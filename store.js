@@ -1,10 +1,4 @@
 // store.js
-// Minimal JSON-file data store. No native dependencies, so it runs anywhere
-// Node runs, with no separate database to install. Fine for a small group
-// of Discord users. If this ever needs to scale past that, swap this file
-// for a real database (Postgres, etc.) without touching server.js much,
-// since everything goes through the functions exported below.
-
 const fs = require("fs");
 const path = require("path");
 
@@ -17,7 +11,7 @@ let writeQueue = Promise.resolve();
 function ensureFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ users: {}, notes: {} }, null, 2));
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ users: {}, characters: {}, notes: {} }, null, 2));
   }
 }
 
@@ -26,6 +20,7 @@ function load() {
   ensureFile();
   cache = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
   if (!cache.users) cache.users = {};
+  if (!cache.characters) cache.characters = {};
   if (!cache.notes) cache.notes = {};
   return cache;
 }
@@ -44,6 +39,11 @@ function persist() {
   return writeQueue;
 }
 
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// ---------- users ----------
 function upsertUser(discordUser) {
   const db = load();
   db.users[discordUser.id] = {
@@ -62,25 +62,76 @@ function getUser(id) {
   return db.users[id] || null;
 }
 
-function listNotes(ownerId) {
+// ---------- characters ----------
+function listCharacters(ownerId) {
   const db = load();
-  return Object.values(db.notes).filter((n) => n.ownerId === ownerId);
+  return Object.values(db.characters)
+    .filter((c) => c.ownerId === ownerId)
+    .sort((a, b) => a.createdAt - b.createdAt);
 }
 
-function getNote(ownerId, id) {
+function getCharacter(ownerId, id) {
   const db = load();
-  const note = db.notes[id];
-  if (!note || note.ownerId !== ownerId) return null;
-  return note;
+  const c = db.characters[id];
+  if (!c || c.ownerId !== ownerId) return null;
+  return c;
+}
+
+function createCharacter(ownerId, partial) {
+  const db = load();
+  const id = uid();
+  const character = {
+    id,
+    ownerId,
+    name: (partial.name || "").slice(0, 64),
+    color: partial.color || "#e8a33d",
+    createdAt: Date.now()
+  };
+  db.characters[id] = character;
+  return persist().then(() => character);
+}
+
+function updateCharacter(ownerId, id, partial) {
+  const db = load();
+  const c = db.characters[id];
+  if (!c || c.ownerId !== ownerId) return Promise.resolve(null);
+  if (typeof partial.name === "string") c.name = partial.name.slice(0, 64);
+  if (typeof partial.color === "string") c.color = partial.color;
+  return persist().then(() => c);
+}
+
+function deleteCharacter(ownerId, id) {
+  const db = load();
+  const c = db.characters[id];
+  if (!c || c.ownerId !== ownerId) return Promise.resolve(false);
+  delete db.characters[id];
+  // Remove all notes belonging to this character
+  Object.keys(db.notes).forEach((nid) => {
+    if (db.notes[nid].characterId === id && db.notes[nid].ownerId === ownerId) {
+      delete db.notes[nid];
+    }
+  });
+  return persist().then(() => true);
+}
+
+// ---------- notes ----------
+function listNotes(ownerId, characterId) {
+  const db = load();
+  return Object.values(db.notes).filter((n) => {
+    if (n.ownerId !== ownerId) return false;
+    if (characterId === "__all__") return true;
+    return (n.characterId || null) === (characterId || null);
+  });
 }
 
 function createNote(ownerId, partial) {
   const db = load();
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const id = uid();
   const now = Date.now();
   const note = {
     id,
     ownerId,
+    characterId: partial.characterId || null,
     title: partial.title || "",
     body: partial.body || "",
     tags: Array.isArray(partial.tags) ? partial.tags : [],
@@ -110,10 +161,14 @@ function deleteNote(ownerId, id) {
   return persist().then(() => true);
 }
 
-function clearNotes(ownerId) {
+function clearNotes(ownerId, characterId) {
   const db = load();
   Object.keys(db.notes).forEach((id) => {
-    if (db.notes[id].ownerId === ownerId) delete db.notes[id];
+    const n = db.notes[id];
+    if (n.ownerId !== ownerId) return;
+    if (characterId === "__all__" || (n.characterId || null) === (characterId || null)) {
+      delete db.notes[id];
+    }
   });
   return persist();
 }
@@ -121,8 +176,12 @@ function clearNotes(ownerId) {
 module.exports = {
   upsertUser,
   getUser,
+  listCharacters,
+  getCharacter,
+  createCharacter,
+  updateCharacter,
+  deleteCharacter,
   listNotes,
-  getNote,
   createNote,
   updateNote,
   deleteNote,
