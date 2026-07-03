@@ -2,6 +2,7 @@
 require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
+const FileStore = require("session-file-store")(session);
 const crypto = require("crypto");
 const path = require("path");
 const store = require("./store");
@@ -26,6 +27,12 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(express.json());
 app.use(session({
+  store: new FileStore({
+    path: path.join(__dirname, "data", "sessions"),
+    ttl: 60 * 60 * 24 * 30,
+    retries: 1,
+    logFn: function() {}
+  }),
   secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
