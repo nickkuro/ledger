@@ -610,6 +610,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
           <div class="cl-version">v0.7.2</div>
           <div class="cl-items">
             <div class="cl-item fix">Sidebar bottom section (user row, add note button, info button) now fixed at bottom and displays over scrolling note list.</div>
+            <div class="cl-item fix">Click out of textarea now immediately renders markdown instead of waiting for delay.</div>
             <div class="cl-item fix">Maybe fixed the damn About and Changelog not displaying 😡</div>
           </div>
         </div>
@@ -1220,6 +1221,16 @@ function renderEditor() {
     ta.style.display="none";
     renderedDiv.classList.add("active");
   }
+
+  ta.addEventListener("blur",function(){
+    clearTimeout(renderTimer);
+    var html=renderMd(note.body);
+    if(html){
+      renderedDiv.innerHTML=html;
+      ta.style.display="none";
+      renderedDiv.classList.add("active");
+    }
+  });
 
   ta.addEventListener("input",function(){
     note.body=ta.value; note.updatedAt=Date.now();
