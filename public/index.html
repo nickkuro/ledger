@@ -15,14 +15,14 @@
   --bg: #14181c; --surface: #1b2126; --surface-hi: #222a30; --border: #2b333a;
   --ink: #ece8e1; --ink-mid: #a8b4be; --ink-dim: #617078;
   --accent: #e8a33d; --accent-ink: #1b130a;
-  --teal: #4fa8a0; --danger: #c9605a; --green: #6fbf73;
+  --teal: #4fa8a0; --danger: #c9605a; --green: #6fbf73; --amber: #e8a33d;
   --shadow: rgba(0,0,0,0.45); --hole: #14181c;
 }
 :root[data-theme="light"] {
   --bg: #e7e8e2; --surface: #f6f6f2; --surface-hi: #ffffff; --border: #d5d6ce;
   --ink: #20242a; --ink-mid: #6b7077; --ink-dim: #9ba3aa;
   --accent: #c9842f; --accent-ink: #fff8ec;
-  --teal: #2f8f87; --danger: #b23b3b; --green: #4a8f4a;
+  --teal: #2f8f87; --danger: #b23b3b; --green: #4a8f4a; --amber: #c9842f;
   --shadow: rgba(20,20,15,0.12); --hole: #e7e8e2;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -595,6 +595,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
           <div class="cl-version">v0.7.1</div>
           <div class="cl-items">
             <div class="cl-item fix">UI elements corrected to use desired wording.</div>
+            <div class="cl-item fix">Changelog UI updated to display cl-item fix element properly.</div>
           </div>
         </div>
         <div class="cl-entry">
