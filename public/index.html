@@ -508,9 +508,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 
     <div class="sidebar-bottom">
       <div class="user-row" id="userRow"></div>
-      <button class="new-note-btn" id="newNoteBtn">+ Add Note</button>
-      <div class="sidebar-footer">
-        <button id="infoBtn">About & Changelog</button>
+      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <button class="new-note-btn" id="newNoteBtn" style="flex: 1;">+ Add Note</button>
+        <button id="infoBtn" style="flex: 0 0 auto; padding: 9px 12px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); color: var(--ink-mid); font-size: 11px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.04em;">About</button>
       </div>
     </div>
   </aside>
@@ -606,7 +606,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
         <div class="cl-entry">
           <div class="cl-version">v0.7.2</div>
           <div class="cl-items">
-            <div class="cl-item fix">Sidebar bottom section (user row, add note button, info button) now fixed at bottom and displays over scrolling note list</div>
+            <div class="cl-item fix">Sidebar bottom section (user row, add note button, info button) now fixed at bottom and displays over scrolling note list.</div>
+            <div class="cl-item fix">Maybe fixed the damn About and Changelog not displaying 😡</div>
           </div>
         </div>
         <div class="cl-entry">
