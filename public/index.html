@@ -358,6 +358,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 }
 .sidebar-footer button:hover { color: var(--ink-mid); }
 
+/* passphrase modal */
+.passphrase-modal { max-width: 360px; width: 95%; text-align: center; }
+.passphrase-icon { font-size: 28px; margin-bottom: 10px; }
+.passphrase-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.passphrase-hint { font-size: 13px; color: var(--ink-mid); line-height: 1.6; margin-bottom: 16px; }
+.passphrase-input {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 9px 12px; font-size: 14px; margin-bottom: 8px;
+  text-align: left;
+}
+.passphrase-input:focus { border-color: var(--accent); outline: none; }
+.passphrase-remember {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--ink-mid); cursor: pointer;
+  margin-bottom: 10px; user-select: none;
+}
+.passphrase-remember input { cursor: pointer; accent-color: var(--accent); }
+.passphrase-error { font-size: 12.5px; color: var(--danger); margin-bottom: 10px; }
+.passphrase-submit { width: 100%; padding: 10px; font-size: 14px; }
+
 /* info modal */
 .info-modal {
   max-width: 480px; width: 95%; max-height: 80vh;
@@ -459,6 +479,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
         </button>
         <div class="settings-menu hidden" id="settingsMenu">
           <button id="clearNotesBtn" class="danger">Clear character's notes</button>
+          <button id="forgetPassBtn">Forget saved passphrase</button>
           <button id="logoutBtn">Log out</button>
         </div>
       </div>
@@ -498,7 +519,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
       <div class="user-row" id="userRow"></div>
       <button class="new-note-btn" id="newNoteBtn">+ New note</button>
       <div class="sidebar-footer">
-        <button id="infoBtn">Created with AI assistance</button>
+        <button id="infoBtn">About &amp; Changelog</button>
       </div>
     </div>
   </aside>
@@ -539,6 +560,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   </div>
 </div>
 
+<!-- PASSPHRASE MODAL -->
+<div class="overlay-bg hidden" id="passphraseOverlay">
+  <div class="modal passphrase-modal">
+    <div class="passphrase-icon">🔑</div>
+    <div class="passphrase-title" id="passphraseTitle">Set a passphrase</div>
+    <div class="passphrase-hint" id="passphraseHint">Your notes will be encrypted so only you can read them. Don't forget this — there's no recovery.</div>
+    <input type="password" class="passphrase-input" id="passphraseInput" placeholder="Enter passphrase…" autocomplete="current-password" />
+    <label class="passphrase-remember">
+      <input type="checkbox" id="passphraseRemember" />
+      Remember on this device
+    </label>
+    <div class="passphrase-error hidden" id="passphraseError"></div>
+    <div class="modal-actions">
+      <button class="btn-primary passphrase-submit" id="passphraseSubmit">Unlock</button>
+    </div>
+  </div>
+</div>
+
 <!-- INFO MODAL (About + Changelog) -->
 <div class="overlay-bg hidden" id="infoOverlay">
   <div class="modal info-modal">
@@ -575,7 +614,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
         <div class="info-heading">What's stored</div>
         <div class="info-item">
           <div class="info-item-title">On the server</div>
-          <div class="info-item-body">Your Discord user ID, username, and avatar URL. All your characters and notes (title, body, tags, timestamps). Session files so you stay logged in across restarts.</div>
+          <div class="info-item-body">Your Discord user ID, username, and avatar URL. All your characters and notes — but titles, bodies, tags, and character names are <strong>encrypted before they leave your browser</strong>. The server stores ciphertext only. Even the server owner cannot read your notes.</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">Your encryption key</div>
+          <div class="info-item-body">Derived from your passphrase using PBKDF2 (100,000 rounds). Stored in sessionStorage by default — cleared when the tab closes. If you check "Remember on this device", the key is also saved in localStorage and persists until you explicitly clear it via Settings → Forget saved passphrase. The key is never sent to the server.</div>
         </div>
         <div class="info-item">
           <div class="info-item-title">In your browser</div>
@@ -586,11 +629,32 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
           <div class="info-item-body">No analytics, no tracking, no ads. Nothing is shared with Discord beyond the initial login handshake.</div>
         </div>
       </div>
-      <div class="info-credit">Built with Node.js, Express, and Discord OAuth2. Created with AI assistance.</div>
+      <div class="info-credit">Built with Node.js, Express, and Discord OAuth2.<br>This app was designed and generated with the assistance of Claude (Anthropic AI).</div>
     </div>
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v0.9.1</div>
+          <div class="cl-items">
+            <div class="cl-item fix">Footer renamed from "Created with AI assistance" to "About &amp; Changelog"</div>
+            <div class="cl-item new">About tab now notes that the app was designed and generated with Claude (Anthropic AI)</div>
+          </div>
+        </div>
+        <div class="cl-entry">
+          <div class="cl-version">v0.9</div>
+          <div class="cl-items">
+            <div class="cl-item new">Remember passphrase option — check "Remember on this device" at login to persist the encryption key in localStorage across sessions</div>
+            <div class="cl-item new">Forget saved passphrase — settings menu option to clear the persisted key and re-lock the app</div>
+          </div>
+        </div>
+        <div class="cl-entry">
+          <div class="cl-version">v0.8</div>
+          <div class="cl-items">
+            <div class="cl-item new">End-to-end encryption — all note titles, bodies, tags, and character names encrypted with AES-GCM before leaving the browser. Server only stores ciphertext.</div>
+            <div class="cl-item new">Passphrase prompt on login — key derived with PBKDF2, stored in sessionStorage only. Never sent to the server.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v0.7</div>
           <div class="cl-items">
@@ -701,6 +765,89 @@ function showToast(msg) {
   setTimeout(function(){t.classList.add("hidden");},2000);
 }
 
+// ---------- Crypto ----------
+var cryptoKey = null;
+
+async function deriveKey(passphrase, userId) {
+  var enc = new TextEncoder();
+  var keyMat = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name:"PBKDF2", salt:enc.encode("ledger-v1-"+userId), iterations:100000, hash:"SHA-256" },
+    keyMat, { name:"AES-GCM", length:256 }, true, ["encrypt","decrypt"]
+  );
+}
+async function encryptText(text) {
+  if(!cryptoKey) return text;
+  var enc = new TextEncoder();
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var ct = await crypto.subtle.encrypt({name:"AES-GCM",iv}, cryptoKey, enc.encode(text||""));
+  var buf = new Uint8Array(12+ct.byteLength);
+  buf.set(iv); buf.set(new Uint8Array(ct),12);
+  return btoa(String.fromCharCode.apply(null, buf));
+}
+async function decryptText(b64) {
+  if(!cryptoKey||!b64) return b64||"";
+  try {
+    var buf = Uint8Array.from(atob(b64), function(c){return c.charCodeAt(0);});
+    var pt = await crypto.subtle.decrypt({name:"AES-GCM",iv:buf.slice(0,12)}, cryptoKey, buf.slice(12));
+    return new TextDecoder().decode(pt);
+  } catch(e) { return ""; }
+}
+async function saveKeyToSession(key, persist) {
+  var jwk = await crypto.subtle.exportKey("jwk", key);
+  var val = JSON.stringify(jwk);
+  sessionStorage.setItem("ledger-key", val);
+  if(persist) localStorage.setItem("ledger-key-persist", val);
+  else localStorage.removeItem("ledger-key-persist");
+}
+async function loadKeyFromSession() {
+  // Check sessionStorage first, then persistent localStorage
+  var s = sessionStorage.getItem("ledger-key") || localStorage.getItem("ledger-key-persist");
+  if(!s) return null;
+  try { return await crypto.subtle.importKey("jwk", JSON.parse(s), {name:"AES-GCM",length:256}, true, ["encrypt","decrypt"]); }
+  catch(e) { return null; }
+}
+function forgetPersistedKey() {
+  localStorage.removeItem("ledger-key-persist");
+  sessionStorage.removeItem("ledger-key");
+}
+async function storeVerification(userId) {
+  localStorage.setItem("ledger-verify-"+userId, await encryptText("LEDGER_OK"));
+}
+async function checkVerification(userId) {
+  var blob = localStorage.getItem("ledger-verify-"+userId);
+  if(!blob) return null; // first time
+  try { return (await decryptText(blob))==="LEDGER_OK"; }
+  catch(e) { return false; }
+}
+
+async function encryptNote(note) {
+  return {
+    title: await encryptText(note.title||""),
+    body:  await encryptText(note.body||""),
+    tags:  await encryptText(JSON.stringify(note.tags||[])),
+    characterId: note.characterId||null,
+    encrypted: true
+  };
+}
+async function decryptNote(note) {
+  if(!note.encrypted) return note; // legacy plaintext
+  return Object.assign({}, note, {
+    title: await decryptText(note.title),
+    body:  await decryptText(note.body),
+    tags:  JSON.parse((await decryptText(note.tags))||"[]")
+  });
+}
+async function encryptCharacter(name, color) {
+  return { name: await encryptText(name), color:color, encrypted:true };
+}
+async function decryptCharacters(arr) {
+  return Promise.all((arr||[]).map(async function(c){
+    if(!c.encrypted) return c;
+    return Object.assign({}, c, { name: await decryptText(c.name) });
+  }));
+}
+
 // ---------- API ----------
 function api(url, opts) {
   return fetch(url, Object.assign({headers:{"Content-Type":"application/json"}}, opts))
@@ -725,7 +872,17 @@ function showApp() {
 function boot() {
   api("/api/me").then(function(user){
     state.user=user;
-    return api("/api/characters");
+    loadKeyFromSession().then(function(key){
+      if(key){ cryptoKey=key; continueBootWithKey(); }
+      else { showPassphraseModal(user.id); }
+    });
+  }).catch(function(){});
+}
+
+function continueBootWithKey() {
+  renderUserRow();
+  api("/api/characters").then(function(chars){
+    return decryptCharacters(chars);
   }).then(function(chars){
     state.characters=chars||[];
     return loadNotes();
@@ -735,11 +892,48 @@ function boot() {
   }).catch(function(){});
 }
 
+function showPassphraseModal(userId) {
+  var hasVerify = !!localStorage.getItem("ledger-verify-"+userId);
+  document.getElementById("passphraseTitle").textContent = hasVerify ? "Unlock your notes" : "Set a passphrase";
+  document.getElementById("passphraseHint").textContent = hasVerify
+    ? "Enter your passphrase to decrypt your notes."
+    : "Your notes will be encrypted so only you can read them. Don't forget this — there is no recovery.";
+  document.getElementById("passphraseSubmit").textContent = hasVerify ? "Unlock" : "Set passphrase";
+  document.getElementById("passphraseOverlay").classList.remove("hidden");
+  setTimeout(function(){ document.getElementById("passphraseInput").focus(); }, 80);
+}
+
+async function submitPassphrase() {
+  var input = document.getElementById("passphraseInput");
+  var errEl = document.getElementById("passphraseError");
+  var pass = input.value;
+  if(!pass){ errEl.textContent="Passphrase can't be empty."; errEl.classList.remove("hidden"); return; }
+  errEl.classList.add("hidden");
+  var userId = state.user.id;
+  var key = await deriveKey(pass, userId);
+  cryptoKey = key;
+  var hasVerify = !!localStorage.getItem("ledger-verify-"+userId);
+  if(hasVerify){
+    var ok = await checkVerification(userId);
+    if(!ok){
+      cryptoKey=null; input.value="";
+      errEl.textContent="Wrong passphrase. Try again."; errEl.classList.remove("hidden"); return;
+    }
+  } else {
+    await storeVerification(userId);
+  }
+  await saveKeyToSession(key, document.getElementById("passphraseRemember").checked);
+  document.getElementById("passphraseOverlay").classList.add("hidden");
+  continueBootWithKey();
+}
+
 function loadNotes() {
   return api("/api/notes?characterId="+encodeURIComponent(state.characterId))
     .then(function(arr){
+      return Promise.all((arr||[]).map(decryptNote));
+    }).then(function(notes){
       state.notes={};
-      (arr||[]).forEach(function(n){state.notes[n.id]=n;});
+      notes.forEach(function(n){ state.notes[n.id]=n; });
     });
 }
 
@@ -752,15 +946,19 @@ function currentChar() {
 // ---------- Note mutations ----------
 function createNote() {
   var charId = state.characterId==="__all__" ? null : state.characterId;
-  api("/api/notes",{method:"POST",body:JSON.stringify({title:"",body:"",tags:[],characterId:charId})})
-    .then(function(note){
-      state.notes[note.id]=note;
-      state.selectedId=note.id;
-      render();
-      document.getElementById("app").classList.add("show-editor");
-      var el=document.getElementById("titleInput");
-      if(el) el.focus();
-    });
+  var blank = {title:"",body:"",tags:[],characterId:charId};
+  encryptNote(blank).then(function(enc){
+    return api("/api/notes",{method:"POST",body:JSON.stringify(enc)});
+  }).then(function(note){
+    // store decrypted copy in state
+    note.title=""; note.body=""; note.tags=[]; note.characterId=charId;
+    state.notes[note.id]=note;
+    state.selectedId=note.id;
+    render();
+    document.getElementById("app").classList.add("show-editor");
+    var el=document.getElementById("titleInput");
+    if(el) el.focus();
+  });
 }
 
 function scheduleSave(note) {
@@ -768,8 +966,9 @@ function scheduleSave(note) {
   renderStatus();
   clearTimeout(saveTimers[note.id]);
   saveTimers[note.id]=setTimeout(function(){
-    api("/api/notes/"+note.id,{method:"PUT",body:JSON.stringify({title:note.title,body:note.body,tags:note.tags})})
-      .then(function(){saveStatus[note.id]="saved"; renderStatus();})
+    encryptNote(note).then(function(enc){
+      return api("/api/notes/"+note.id,{method:"PUT",body:JSON.stringify(enc)});
+    }).then(function(){saveStatus[note.id]="saved"; renderStatus();})
       .catch(function(){saveStatus[note.id]="error"; renderStatus();});
   },500);
 }
@@ -810,12 +1009,14 @@ function addCharacter() {
   var name=document.getElementById("newCharInput").value.trim();
   var color=document.getElementById("newCharColor").value;
   if(!name) return;
-  api("/api/characters",{method:"POST",body:JSON.stringify({name:name,color:color})})
-    .then(function(c){
-      state.characters.push(c);
-      document.getElementById("newCharInput").value="";
-      renderCharDropdown();
-    });
+  encryptCharacter(name, color).then(function(enc){
+    return api("/api/characters",{method:"POST",body:JSON.stringify(enc)});
+  }).then(function(c){
+    c.name=name; // keep plaintext in state
+    state.characters.push(c);
+    document.getElementById("newCharInput").value="";
+    renderCharDropdown();
+  });
 }
 
 function deleteCharacter(id) {
@@ -859,15 +1060,17 @@ function saveCharEdit() {
   if(!name) return;
   var selected=document.querySelector("#charEditColors .color-swatch.selected");
   var color=selected?selected.getAttribute("data-color"):CHAR_COLORS[0];
-  api("/api/characters/"+editingCharId,{method:"PUT",body:JSON.stringify({name:name,color:color})})
-    .then(function(c){
-      var idx=state.characters.findIndex(function(x){return x.id===c.id;});
-      if(idx>-1) state.characters[idx]=c;
-      document.getElementById("charEditOverlay").classList.add("hidden");
-      editingCharId=null;
-      renderCharDropdown();
-      renderCharBar();
-      renderList();
+  encryptCharacter(name, color).then(function(enc){
+    return api("/api/characters/"+editingCharId,{method:"PUT",body:JSON.stringify(enc)});
+  }).then(function(c){
+    c.name=name; // keep plaintext in state
+    var idx=state.characters.findIndex(function(x){return x.id===c.id;});
+    if(idx>-1) state.characters[idx]=c;
+    document.getElementById("charEditOverlay").classList.add("hidden");
+    editingCharId=null;
+    renderCharDropdown();
+    renderCharBar();
+    renderList();
     });
 }
 
@@ -1258,7 +1461,12 @@ document.getElementById("clearNotesBtn").addEventListener("click",function(){
   openConfirm("Clear all notes for "+label+"? This can't be undone.",{type:"clearNotes"});
 });
 
-document.getElementById("logoutBtn").addEventListener("click",function(){
+document.getElementById("forgetPassBtn").addEventListener("click",function(){
+  document.getElementById("settingsMenu").classList.add("hidden");
+  forgetPersistedKey();
+  showToast("Saved passphrase cleared");
+});
+
   document.getElementById("settingsMenu").classList.add("hidden");
   api("/auth/logout",{method:"POST"}).then(function(){
     state.notes={}; state.selectedId=null; state.user=null;
@@ -1306,6 +1514,12 @@ document.addEventListener("click",function(e){
   if(!menu.contains(e.target)&&!tog.contains(e.target)){
     menu.classList.add("hidden");
   }
+});
+
+// passphrase modal
+document.getElementById("passphraseSubmit").addEventListener("click", submitPassphrase);
+document.getElementById("passphraseInput").addEventListener("keydown", function(e){
+  if(e.key==="Enter") submitPassphrase();
 });
 
 // info modal
