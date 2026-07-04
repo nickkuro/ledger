@@ -592,11 +592,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
         <div class="cl-entry">
+          <div class="cl-version">v0.8</div>
+          <div class="cl-items">
+            <div class="cl-item new">Live markdown rendering — editor now renders instantly as you type without delay or mode switching</div>
+          </div>
+        </div>
+        <div class="cl-entry">
           <div class="cl-version">v0.7.1</div>
           <div class="cl-items">
             <div class="cl-item fix">UI elements corrected to use desired wording.</div>
             <div class="cl-item fix">Changelog UI updated to display cl-item fix element properly.</div>
-            
           </div>
         </div>
         <div class="cl-entry">
@@ -1192,17 +1197,31 @@ function renderEditor() {
   }
 
   // Start rendered if note already has content
-  if(note.body && note.body.trim()) showRendered();
+  if(note.body && note.body.trim()) {
+    var html=renderMd(note.body);
+    renderedDiv.innerHTML=html;
+    ta.style.display="none";
+    renderedDiv.classList.add("active");
+  }
 
   ta.addEventListener("input",function(){
     note.body=ta.value; note.updatedAt=Date.now();
     scheduleSave(note); renderList(); renderStatus();
     clearTimeout(renderTimer);
-    renderTimer=setTimeout(showRendered, 1500);
+    // Render immediately without delay
+    var html=renderMd(note.body);
+    renderedDiv.innerHTML=html;
+    renderedDiv.classList.add("active");
+    ta.style.display="none";
   });
 
   // Click rendered area → back to editing
-  renderedDiv.addEventListener("click",function(){ showTextarea(); });
+  renderedDiv.addEventListener("click",function(){ 
+    ta.style.display="";
+    renderedDiv.classList.remove("active");
+    ta.focus();
+  });
+
 
   document.getElementById("deleteBtn").addEventListener("click",function(){
     openConfirm("Delete \""+(note.title||"Untitled")+"\"? This can't be undone.",{type:"deleteNote",id:note.id});
