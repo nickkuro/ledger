@@ -479,9 +479,27 @@ kbd {
 /* changelog */
 .changelog { display: flex; flex-direction: column; gap: 18px; }
 .cl-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0;
+  position: relative;
+  color: var(--ink-mid);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+.cl-separator::before,
+.cl-separator::after {
+  content: "";
+  flex: 1;
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--border), transparent);
-  margin: 2px 0;
+}
+.cl-separator span {
+  padding: 0 10px;
+  background: var(--bg);
 }
 .cl-entry { display: flex; gap: 14px; }
 .cl-version {
@@ -835,7 +853,7 @@ kbd {
             <div class="cl-item fix">The website is usable, but I'm still making changes, so naturally the legal docs had to join the chaos.</div>
           </div>
         </div>
-        <div class="cl-separator" aria-label="We outta Alpha, Homies."></div>
+        <div class="cl-separator"><span>We outta Alpha, Homies.</span></div>
         <div class="cl-entry">
           <div class="cl-version">v0.9.1</div>
           <div class="cl-items">
