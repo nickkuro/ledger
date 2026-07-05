@@ -28,6 +28,33 @@
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
+
+/* slick custom scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232,163,61,0.35) rgba(255,255,255,0.05);
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.04);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(232,163,61,0.25);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(232,163,61,0.45);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--ink); height: 100vh; overflow: hidden; font-size: 15px; }
 button, input, textarea, select { font-family: inherit; color: inherit; background: none; border: none; }
 button { cursor: pointer; }
@@ -867,6 +894,7 @@ kbd {
           <div class="cl-version">v1.0.1</div>
           <div class="cl-items">
             <div class="cl-item fix">Reminder and DM-sent messages were polished to feel a bit nicer and more readable.</div>
+            <div class="cl-item new">Added a custom slick scrollbar design across the app.</div>
           </div>
         </div>
         <div class="cl-entry">
