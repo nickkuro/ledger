@@ -451,6 +451,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .info-item { margin-bottom: 10px; }
 .info-item-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
 .info-item-body { font-size: 12.5px; color: var(--ink-mid); line-height: 1.6; }
+.legal-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.legal-link-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink); text-decoration: none;
+  font-size: 12px; font-weight: 600; transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.legal-link-btn:hover {
+  transform: translateY(-1px); border-color: var(--accent); background: var(--surface-hi);
+}
 .info-credit {
   font-size: 11px; color: var(--ink-dim); text-align: center;
   padding: 10px 0 4px; font-family: 'IBM Plex Mono', monospace;
@@ -795,8 +805,10 @@ kbd {
         <div class="info-item">
           <div class="info-item-title">Policies</div>
           <div class="info-item-body">
-            <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a><br />
-            <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+            <div class="legal-links">
+              <a class="legal-link-btn" href="/terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+              <a class="legal-link-btn" href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+            </div>
           </div>
         </div>
       </div>
