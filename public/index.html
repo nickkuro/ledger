@@ -461,6 +461,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .legal-link-btn:hover {
   transform: translateY(-1px); border-color: var(--accent); background: var(--surface-hi);
 }
+.donate-link-btn {
+  background: linear-gradient(135deg, rgba(232,163,61,0.15), rgba(79,168,160,0.15));
+  border-color: rgba(232,163,61,0.35);
+}
+.donate-link-btn:hover {
+  background: linear-gradient(135deg, rgba(232,163,61,0.22), rgba(79,168,160,0.22));
+}
 .info-credit {
   font-size: 11px; color: var(--ink-dim); text-align: center;
   padding: 10px 0 4px; font-family: 'IBM Plex Mono', monospace;
@@ -831,6 +838,9 @@ kbd {
             <div class="legal-links">
               <a class="legal-link-btn" href="/terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a>
               <a class="legal-link-btn" href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+            </div>
+            <div class="legal-links" style="margin-top: 10px;">
+              <a class="legal-link-btn donate-link-btn" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer">Donate to a starving artist</a>
             </div>
           </div>
         </div>
