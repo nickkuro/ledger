@@ -863,7 +863,7 @@ kbd {
         <div class="cal-side-empty">Click a day to see its notes and reminders.</div>
       </div>
       <div class="cal-side-add">
-        <button id="calSideAddNote">+ Note for this day</button>
+        <button id="calSideAddNote" disabled style="opacity:0.35;cursor:not-allowed;">+ Note for this day</button>
       </div>
     </div>
 
@@ -1032,7 +1032,7 @@ kbd {
     <div class="info-panel" id="tab-about">
       <div class="info-section">
         <div class="info-logo">¶ LEDGER</div>
-        <p class="info-sub">Version 1.0.2 — a private note-keeping app for characters and stories, built with Discord login so your group can each have their own space.</p>
+        <p class="info-sub">Version 2.0.1 — a private note-keeping app for characters and stories, built with Discord login so your group can each have their own space.</p>
       </div>
       <div class="info-section">
         <div class="info-heading">How it works</div>
@@ -1116,16 +1116,23 @@ kbd {
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
         <div class="cl-entry">
+          <div class="cl-version">v2.0.1</div>
+          <div class="cl-items">
+            <div class="cl-item fix">Greyed out the calendar button to add a new note when no day is selected to avoid confusion.</div>
+              <div class="cl-item fix">Updated About section.</div>
+          </div>
+        </div>
+        <div class="cl-entry">
           <div class="cl-version">v2.0</div>
           <div class="cl-items">
             <div class="cl-item new">Calendar — full month and week views accessible via a new tab in the sidebar. Days with due notes or reminders show coloured pills.</div>
             <div class="cl-item new">Due dates on notes — set a date from the editor and it appears on the calendar automatically.</div>
             <div class="cl-item new">Day detail panel — click any calendar day to see all its due notes and reminders in the sidebar, each clickable to jump straight to the note.</div>
             <div class="cl-item new">"Note for this day" shortcut — creates a new note from the calendar with the due date pre-filled.</div>
-            <div class="cl-item fix">Markdown render delay increased per suggestion from users.</div>
+            <div class="cl-item fix">Markdown render delay reduced — the auto-render timeout was shortened so formatted output appears sooner after you stop typing.</div>
           </div>
         </div>
-        <div class="cl-separator"><span>The Big One.</span></div>
+        <div class="cl-separator"><span>One of Many <i>Big Ones</i>.</span></div>
         <div class="cl-entry">
           <div class="cl-version">v1.0.2</div>
           <div class="cl-items">
@@ -2431,7 +2438,20 @@ function renderWeekGrid(monday, eventMap) {
 function renderCalSidePanel(date) {
   var dateEl = document.getElementById("calSideDate");
   var bodyEl = document.getElementById("calSideBody");
-  if(!date){ dateEl.textContent="Select a day"; bodyEl.innerHTML='<div class="cal-side-empty">Click a day to see its notes and reminders.</div>'; return; }
+  var addBtn = document.getElementById("calSideAddNote");
+
+  if(!date){
+    dateEl.textContent="Select a day";
+    bodyEl.innerHTML='<div class="cal-side-empty">Click a day to see its notes and reminders.</div>';
+    addBtn.disabled=true;
+    addBtn.style.opacity="0.35";
+    addBtn.style.cursor="not-allowed";
+    return;
+  }
+
+  addBtn.disabled=false;
+  addBtn.style.opacity="";
+  addBtn.style.cursor="";
 
   var k = dayKey(date);
   var eventMap = buildEventMap();
