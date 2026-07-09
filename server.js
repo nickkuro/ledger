@@ -12,6 +12,8 @@ const {
   SESSION_SECRET, ALLOWED_DISCORD_IDS, BOT_TOKEN, ADMIN_DISCORD_ID, PORT
 } = process.env;
 
+console.log("ADMIN_DISCORD_ID:", JSON.stringify(ADMIN_DISCORD_ID), "length:", ADMIN_DISCORD_ID?.length);
+
 if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET || !DISCORD_REDIRECT_URI || !SESSION_SECRET) {
   console.error("Missing required env vars.");
   process.exit(1);
