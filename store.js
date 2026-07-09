@@ -23,6 +23,7 @@ function load() {
   if (!cache.characters) cache.characters = {};
   if (!cache.notes) cache.notes = {};
   if (!cache.reminders) cache.reminders = {};
+  if (!cache.bills) cache.bills = {};
   return cache;
 }
 
@@ -242,9 +243,103 @@ function deleteReminder(id) {
   return persist().then(() => true);
 }
 
+// ---------- bills (admin only) ----------
+function advanceDueDate(dateStr, frequency) {
+  const d = new Date(dateStr + "T00:00:00");
+  switch (frequency) {
+    case "weekly":    d.setDate(d.getDate() + 7); break;
+    case "biweekly":  d.setDate(d.getDate() + 14); break;
+    case "monthly":   d.setMonth(d.getMonth() + 1); break;
+    case "quarterly": d.setMonth(d.getMonth() + 3); break;
+    case "yearly":    d.setFullYear(d.getFullYear() + 1); break;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+function listBills() {
+  const db = load();
+  return Object.values(db.bills).sort((a, b) => {
+    if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+}
+
+function getBill(id) {
+  const db = load();
+  return db.bills[id] || null;
+}
+
+function createBill(partial) {
+  const db = load();
+  const id = uid();
+  const bill = {
+    id,
+    name:         partial.name || "New bill",
+    amount:       parseFloat(partial.amount) || 0,
+    currency:     partial.currency || "CAD",
+    dueDate:      partial.dueDate || null,
+    frequency:    partial.frequency || "monthly",
+    category:     partial.category || "Other",
+    autoPay:      Boolean(partial.autoPay),
+    url:          partial.url || "",
+    color:        partial.color || "#c9605a",
+    notes:        partial.notes || "",
+    reminderDays: partial.reminderDays != null ? Number(partial.reminderDays) : null,
+    paid:         false,
+    paidDates:    [],
+    createdAt:    Date.now()
+  };
+  db.bills[id] = bill;
+  return persist().then(() => bill);
+}
+
+function updateBill(id, partial) {
+  const db = load();
+  const bill = db.bills[id];
+  if (!bill) return Promise.resolve(null);
+  const fields = ["name","amount","currency","dueDate","frequency","category","autoPay","url","color","notes","reminderDays","paid"];
+  fields.forEach(f => { if (f in partial) bill[f] = partial[f]; });
+  if (typeof bill.amount === "string") bill.amount = parseFloat(bill.amount) || 0;
+  return persist().then(() => bill);
+}
+
+function markBillPaid(id) {
+  const db = load();
+  const bill = db.bills[id];
+  if (!bill) return Promise.resolve(null);
+  const today = new Date().toISOString().slice(0, 10);
+  if (!bill.paidDates) bill.paidDates = [];
+  bill.paidDates.unshift(today);
+  if (bill.frequency === "one-time") {
+    bill.paid = true;
+  } else if (bill.dueDate) {
+    bill.dueDate = advanceDueDate(bill.dueDate, bill.frequency);
+    bill.paid = false;
+  }
+  return persist().then(() => bill);
+}
+
+function markBillUnpaid(id) {
+  const db = load();
+  const bill = db.bills[id];
+  if (!bill) return Promise.resolve(null);
+  bill.paid = false;
+  return persist().then(() => bill);
+}
+
+function deleteBill(id) {
+  const db = load();
+  if (!db.bills[id]) return Promise.resolve(false);
+  delete db.bills[id];
+  return persist().then(() => true);
+}
+
 module.exports = {
   upsertUser, getUser, updateUserTimezone,
   listCharacters, createCharacter, updateCharacter, deleteCharacter,
   listNotes, getNote, createNote, updateNote, deleteNote, clearNotes,
-  listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder
+  listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,
+  listBills, getBill, createBill, updateBill, markBillPaid, markBillUnpaid, deleteBill
 };

@@ -9,7 +9,7 @@ const store = require("./store");
 
 const {
   DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_REDIRECT_URI,
-  SESSION_SECRET, ALLOWED_DISCORD_IDS, BOT_TOKEN, PORT
+  SESSION_SECRET, ALLOWED_DISCORD_IDS, BOT_TOKEN, ADMIN_DISCORD_ID, PORT
 } = process.env;
 
 if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET || !DISCORD_REDIRECT_URI || !SESSION_SECRET) {
@@ -37,6 +37,14 @@ app.use(session({
 
 function requireAuth(req, res, next) {
   if (!req.session.user) return res.status(401).json({ error: "Not logged in" });
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.session.user) return res.status(401).json({ error: "Not logged in" });
+  if (!ADMIN_DISCORD_ID || req.session.user.id !== ADMIN_DISCORD_ID) {
+    return res.status(403).json({ error: "Admin only" });
+  }
   next();
 }
 
@@ -207,7 +215,7 @@ app.post("/auth/logout", (req, res) => {
 
 app.get("/api/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "Not logged in" });
-  res.json(req.session.user);
+  res.json({ ...req.session.user, isAdmin: req.session.user.id === ADMIN_DISCORD_ID });
 });
 
 app.put("/api/me/timezone", requireAuth, async (req, res) => {
@@ -288,6 +296,59 @@ app.post("/api/reminders", requireAuth, async (req, res) => {
 });
 app.delete("/api/reminders/:id", requireAuth, async (req, res) => {
   const ok = await store.deleteReminder(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+// ---------- Bills (admin only) ----------
+app.get("/api/bills", requireAdmin, (req, res) => res.json(store.listBills()));
+
+app.post("/api/bills", requireAdmin, async (req, res) => {
+  const bill = await store.createBill(req.body || {});
+  res.status(201).json(bill);
+});
+
+app.put("/api/bills/:id", requireAdmin, async (req, res) => {
+  const bill = await store.updateBill(req.params.id, req.body || {});
+  if (!bill) return res.status(404).json({ error: "Not found" });
+  res.json(bill);
+});
+
+app.post("/api/bills/:id/pay", requireAdmin, async (req, res) => {
+  const bill = await store.markBillPaid(req.params.id);
+  if (!bill) return res.status(404).json({ error: "Not found" });
+  if (BOT_TOKEN) {
+    const admin = store.getUser(ADMIN_DISCORD_ID);
+    if (admin) sendDM(admin.id, `✅ **${bill.name}** marked as paid. Next due: ${bill.dueDate || "—"}`, { label: "Bill paid" })
+      .catch(e => console.error("Bill paid DM:", e.message));
+  }
+  res.json(bill);
+});
+
+app.post("/api/bills/:id/unpay", requireAdmin, async (req, res) => {
+  const bill = await store.markBillUnpaid(req.params.id);
+  if (!bill) return res.status(404).json({ error: "Not found" });
+  res.json(bill);
+});
+
+app.post("/api/bills/:id/send-dm", requireAdmin, async (req, res) => {
+  if (!BOT_TOKEN) return res.status(503).json({ error: "Bot not configured" });
+  const bill = store.getBill(req.params.id);
+  if (!bill) return res.status(404).json({ error: "Not found" });
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = bill.dueDate && bill.dueDate < today && !bill.paid;
+  const status = bill.paid ? "✅ Paid" : isOverdue ? "⚠️ Overdue" : "Upcoming";
+  const msg = `💳 **${bill.name}**\n\n**Amount:** ${bill.currency} $${Number(bill.amount).toFixed(2)}\n**Due:** ${bill.dueDate || "—"}\n**Status:** ${status}\n**Frequency:** ${bill.frequency}\n**Category:** ${bill.category}${bill.notes ? `\n**Notes:** ${bill.notes}` : ""}`;
+  try {
+    await sendDM(ADMIN_DISCORD_ID, msg, { label: "Bill from Ledger", buttonUrl: getAppUrl(), buttonLabel: "View in Ledger" });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/bills/:id", requireAdmin, async (req, res) => {
+  const ok = await store.deleteBill(req.params.id);
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 });
