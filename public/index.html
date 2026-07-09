@@ -2238,6 +2238,14 @@ document.getElementById("confirmOk").addEventListener("click",function(){
   if(pendingAction.type==="deleteNote") deleteNote(pendingAction.id);
   else if(pendingAction.type==="clearNotes") clearNotes();
   else if(pendingAction.type==="deleteChar") deleteCharacter(pendingAction.id);
+  else if(pendingAction.type==="deleteBill"){
+    api("/api/bills/"+pendingAction.id,{method:"DELETE"}).then(function(){
+      state.bills=state.bills.filter(function(b){return b.id!==pendingAction.id;});
+      if(state.selectedBillId===pendingAction.id) state.selectedBillId=null;
+      renderBillList();
+      showToast("Bill deleted");
+    });
+  }
   closeConfirm();
 });
 document.getElementById("confirmOverlay").addEventListener("click",function(e){
@@ -2915,20 +2923,6 @@ document.getElementById("addBillBtn").addEventListener("click",function(){
       var el=document.getElementById("billNameInput");
       if(el){el.select();el.focus();}
     });
-});
-
-// Hook deleteBill into confirm modal
-document.getElementById("confirmOk").addEventListener("click",function(){
-  if(pendingAction&&pendingAction.type==="deleteBill"){
-    api("/api/bills/"+pendingAction.id,{method:"DELETE"}).then(function(){
-      state.bills=state.bills.filter(function(b){return b.id!==pendingAction.id;});
-      if(state.selectedBillId===pendingAction.id) state.selectedBillId=null;
-      renderBillList();
-      showToast("Bill deleted");
-    });
-    document.getElementById("confirmOverlay").classList.add("hidden");
-    pendingAction=null;
-  }
 });
 
 boot();
