@@ -2242,6 +2242,10 @@ document.getElementById("confirmOk").addEventListener("click",function(){
     api("/api/bills/"+pendingAction.id,{method:"DELETE"}).then(function(){
       state.bills=state.bills.filter(function(b){return b.id!==pendingAction.id;});
       if(state.selectedBillId===pendingAction.id) state.selectedBillId=null;
+      var placeholder=document.getElementById("billPlaceholder");
+      var editor=document.getElementById("billEditor");
+      if(placeholder) placeholder.classList.remove("hidden");
+      if(editor) editor.classList.add("hidden");
       renderBillList();
       showToast("Bill deleted");
     });
