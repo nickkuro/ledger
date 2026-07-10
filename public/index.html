@@ -28,6 +28,7 @@
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
+:root { --app-vh: 1vh; }
 
 /* slick custom scrollbars */
 * {
@@ -55,7 +56,7 @@ html, body { height: 100%; }
   background: transparent;
 }
 
-body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--ink); height: 100vh; height: 100dvh; overflow: hidden; font-size: 15px; }
+body { font-family: 'IBM Plex Sans', sans-serif; background: var(--bg); color: var(--ink); height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100); overflow: hidden; font-size: 15px; }
 button, input, textarea, select { font-family: inherit; color: inherit; background: none; border: none; }
 button { cursor: pointer; }
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -80,14 +81,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .discord-btn:hover { filter: brightness(1.1); }
 
 /* ===================== APP SHELL ===================== */
-.app { display: none; height: 100vh; height: 100dvh; width: 100vw; }
+.app { display: none; height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100); width: 100vw; }
 .app.ready { display: flex; }
 
 /* ===================== SIDEBAR ===================== */
 .sidebar {
   width: 300px; min-width: 300px; background: var(--bg);
   border-right: 1px solid var(--border); display: flex;
-  flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
+  flex-direction: column; height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100); overflow: hidden;
 }
 
 /* --- top bar --- */
@@ -276,7 +277,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .char-group-cards .note-card:last-child { border-bottom: none; }
 
 /* ===================== EDITOR ===================== */
-.editor { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-width: 0; }
+.editor { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100); min-width: 0; }
 .editor-placeholder {
   flex: 1; display: flex; align-items: center; justify-content: center;
   color: var(--ink-dim); font-size: 14px; text-align: center; padding: 30px;
@@ -583,7 +584,7 @@ kbd {
 
 /* calendar main area */
 .cal-main {
-  flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh;
+  flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100);
   min-width: 0; overflow: hidden;
 }
 .cal-header {
@@ -691,7 +692,7 @@ kbd {
 .bill-add-btn { margin: 0 12px 12px; padding: 9px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 13px; width: calc(100% - 24px); }
 .bill-add-btn:hover { filter: brightness(1.06); }
 .bill-sidebar-empty { padding: 28px 12px; color: var(--ink-dim); font-size: 13px; text-align: center; line-height: 1.6; }
-.bill-main { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-width: 0; }
+.bill-main { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100); min-width: 0; }
 .bill-editor-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--ink-dim); font-size: 14px; text-align: center; padding: 30px; }
 .bill-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .bill-editor-head { padding: 14px 26px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -1206,6 +1207,12 @@ kbd {
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
         <div class="cl-entry">
+          <div class="cl-version">v2.2.1</div>
+          <div class="cl-items">
+            <div class="cl-item fix">Fixed a scrollbar bug on mobile where the notes list wouldn't scroll properly until you opened a note.</div>
+          </div>
+        </div>
+        <div class="cl-entry">
           <div class="cl-version">v2.2</div>
           <div class="cl-items">
             <div class="cl-item fix">Login and API requests are now rate-limited to prevent abuse.</div>
@@ -1374,6 +1381,18 @@ kbd {
 <script>
 (function () {
 "use strict";
+
+// Keep --app-vh pinned to the actual visible viewport height (not the
+// address-bar-collapsed max height that 100dvh can lag behind on some
+// Android builds, which left scrollable panes with stale scroll metrics).
+function syncAppVh() {
+  var h = (window.visualViewport ? window.visualViewport.height : window.innerHeight) * 0.01;
+  document.documentElement.style.setProperty("--app-vh", h + "px");
+}
+syncAppVh();
+window.addEventListener("resize", syncAppVh);
+window.addEventListener("orientationchange", syncAppVh);
+if (window.visualViewport) window.visualViewport.addEventListener("resize", syncAppVh);
 
 var CHAR_COLORS = ["#e8a33d","#4fa8a0","#c97b8e","#7c8cc9","#9bb05a","#cf9bd6","#e07b54","#5fa8d4"];
 var TAG_PALETTE = ["#e8a33d","#4fa8a0","#c97b8e","#7c8cc9","#9bb05a","#cf9bd6"];
