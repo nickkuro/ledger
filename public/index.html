@@ -694,6 +694,29 @@ kbd {
 .bill-sidebar-empty { padding: 28px 12px; color: var(--ink-dim); font-size: 13px; text-align: center; line-height: 1.6; }
 .bill-main { flex: 1; display: flex; flex-direction: column; height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100); min-width: 0; }
 .bill-editor-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--ink-dim); font-size: 14px; text-align: center; padding: 30px; }
+.bill-dashboard { flex: 1; overflow-y: auto; padding: 34px 30px; }
+.bill-dashboard-empty { color: var(--ink-dim); font-size: 14px; text-align: center; padding: 60px 30px; }
+.bill-dash-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; max-width: 560px; margin: 0 auto 26px; }
+.bill-dash-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 10px; text-align: center; }
+.bill-dash-stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; }
+.bill-dash-stat-label { font-size: 10.5px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+.bill-dash-stat.overdue .bill-dash-stat-value { color: var(--danger); }
+.bill-dash-stat.upcoming .bill-dash-stat-value { color: var(--amber); }
+.bill-dash-stat.paid .bill-dash-stat-value { color: var(--green); }
+.bill-dash-section { max-width: 560px; margin: 0 auto 22px; }
+.bill-dash-heading {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-dim); margin-bottom: 8px;
+  padding-bottom: 5px; border-bottom: 1px solid var(--border);
+}
+.bill-dash-item {
+  padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.bill-dash-item:hover { border-color: var(--accent); }
+.bill-dash-item-name { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bill-dash-item-meta { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-dim); flex-shrink: 0; }
 .bill-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .bill-editor-head { padding: 14px 26px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .bill-editor-toprow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -988,7 +1011,7 @@ kbd {
 
   <!-- BILLS MAIN VIEW -->
   <div class="bill-main hidden" id="billMain">
-    <div class="bill-editor-placeholder" id="billPlaceholder">Select a bill or add a new one.</div>
+    <div class="bill-dashboard" id="billPlaceholder"></div>
     <div class="bill-editor hidden" id="billEditor"></div>
   </div>
 
@@ -1206,6 +1229,13 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.2.2</div>
+          <div class="cl-items">
+            <div class="cl-item fix">Bill editor fields no longer lose focus mid-typing when autosave kicks in.</div>
+            <div class="cl-item new">Bills tab now shows a quick overview (overdue, upcoming, paid, total due) when no bill is selected.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.2.1</div>
           <div class="cl-items">
@@ -2774,7 +2804,8 @@ function billStatus(b) {
   return "upcoming";
 }
 
-function renderBillList() {
+function renderBillList(opts) {
+  opts = opts || {};
   var list = document.getElementById("billList");
   var placeholder = document.getElementById("billPlaceholder");
   var editor = document.getElementById("billEditor");
@@ -2834,11 +2865,69 @@ function renderBillList() {
   if(state.selectedBillId && state.bills.find(function(b){return b.id===state.selectedBillId;})){
     placeholder.classList.add("hidden");
     editor.classList.remove("hidden");
-    renderBillEditor();
+    if(!opts.keepEditor) renderBillEditor();
   } else {
     placeholder.classList.remove("hidden");
     editor.classList.add("hidden");
+    renderBillDashboard();
   }
+}
+
+function renderBillDashboard() {
+  var el = document.getElementById("billPlaceholder");
+  if(!el) return;
+
+  if(!state.bills.length){
+    el.innerHTML = '<div class="bill-dashboard-empty">No bills yet. Add one to see an overview here.</div>';
+    return;
+  }
+
+  var overdue = [], upcoming = [], paid = [];
+  var dueTotals = {};
+  state.bills.forEach(function(b){
+    var status = billStatus(b);
+    if(status==="overdue") overdue.push(b);
+    else if(status==="paid") paid.push(b);
+    else upcoming.push(b);
+    if(status!=="paid"){
+      dueTotals[b.currency] = (dueTotals[b.currency]||0) + (Number(b.amount)||0);
+    }
+  });
+  overdue.sort(function(a,b){return (a.dueDate||"").localeCompare(b.dueDate||"");});
+  upcoming.sort(function(a,b){return (a.dueDate||"").localeCompare(b.dueDate||"");});
+
+  var totalsLine = Object.keys(dueTotals).map(function(cur){
+    return cur+" $"+dueTotals[cur].toFixed(2);
+  }).join(" · ") || "—";
+
+  function itemRow(b){
+    return '<div class="bill-dash-item" data-bill-id="'+b.id+'" style="border-left:2px solid '+b.color+'">'+
+      '<span class="bill-dash-item-name">'+esc(b.name)+'</span>'+
+      '<span class="bill-dash-item-meta">'+(b.dueDate||"No date")+' · '+b.currency+' $'+Number(b.amount).toFixed(2)+'</span>'+
+    '</div>';
+  }
+
+  function section(title, bills, emptyText){
+    var rows = bills.length ? bills.map(itemRow).join("") : '<div class="bill-dash-empty">'+emptyText+'</div>';
+    return '<div class="bill-dash-section"><div class="bill-dash-heading">'+title+'</div>'+rows+'</div>';
+  }
+
+  el.innerHTML =
+    '<div class="bill-dash-stats">'+
+      '<div class="bill-dash-stat overdue"><div class="bill-dash-stat-value">'+overdue.length+'</div><div class="bill-dash-stat-label">Overdue</div></div>'+
+      '<div class="bill-dash-stat upcoming"><div class="bill-dash-stat-value">'+upcoming.length+'</div><div class="bill-dash-stat-label">Upcoming</div></div>'+
+      '<div class="bill-dash-stat paid"><div class="bill-dash-stat-value">'+paid.length+'</div><div class="bill-dash-stat-label">Paid</div></div>'+
+      '<div class="bill-dash-stat"><div class="bill-dash-stat-value" style="font-size:15px;">'+totalsLine+'</div><div class="bill-dash-stat-label">Total due</div></div>'+
+    '</div>'+
+    section("Overdue", overdue, "Nothing overdue.") +
+    section("Due soon", upcoming.slice(0,5), "Nothing else due.");
+
+  el.querySelectorAll(".bill-dash-item").forEach(function(item){
+    item.addEventListener("click", function(){
+      state.selectedBillId = item.getAttribute("data-bill-id");
+      renderBillList();
+    });
+  });
 }
 
 function renderBillEditor() {
@@ -2932,12 +3021,12 @@ function renderBillEditor() {
     })}).then(function(updated){
       var idx=state.bills.findIndex(function(b){return b.id===updated.id;});
       if(idx>-1){state.bills[idx]=updated; bill=updated;}
-      renderBillList();
+      renderBillList({keepEditor:true});
     });
   }
 
   var saveTimer=null;
-  function debounceSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveBill,600); }
+  function debounceSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(saveBill,500); }
   ["billNameInput","billAmount","billCurrency","billDueDate","billFrequency","billCategory","billUrl","billReminderDays","billNotes"].forEach(function(id){
     var el=document.getElementById(id); if(el) el.addEventListener("input",debounceSave);
   });
