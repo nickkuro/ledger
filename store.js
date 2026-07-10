@@ -25,6 +25,18 @@ function load() {
   if (!cache.reminders) cache.reminders = {};
   if (!cache.bills) cache.bills = {};
   if (!cache.allowlist) cache.allowlist = {};
+  if (!cache.billsAccess) cache.billsAccess = {};
+
+  // Migrate bills predating per-user ownership to the original admin.
+  const legacyOwner = process.env.ADMIN_DISCORD_ID;
+  if (legacyOwner) {
+    let migrated = false;
+    Object.values(cache.bills).forEach((b) => {
+      if (!b.ownerId) { b.ownerId = legacyOwner; migrated = true; }
+    });
+    if (migrated) persist();
+  }
+
   return cache;
 }
 
@@ -244,7 +256,7 @@ function deleteReminder(id) {
   return persist().then(() => true);
 }
 
-// ---------- bills (admin only) ----------
+// ---------- bills (per-user, gated by bills access) ----------
 function advanceDueDate(dateStr, frequency) {
   const d = new Date(dateStr + "T00:00:00");
   switch (frequency) {
@@ -257,26 +269,31 @@ function advanceDueDate(dateStr, frequency) {
   return d.toISOString().slice(0, 10);
 }
 
-function listBills() {
+function listBills(ownerId) {
   const db = load();
-  return Object.values(db.bills).sort((a, b) => {
-    if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
-    if (a.dueDate) return -1;
-    if (b.dueDate) return 1;
-    return (a.name || "").localeCompare(b.name || "");
-  });
+  return Object.values(db.bills)
+    .filter((b) => b.ownerId === ownerId)
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return (a.name || "").localeCompare(b.name || "");
+    });
 }
 
-function getBill(id) {
+function getBill(ownerId, id) {
   const db = load();
-  return db.bills[id] || null;
+  const bill = db.bills[id];
+  if (!bill || bill.ownerId !== ownerId) return null;
+  return bill;
 }
 
-function createBill(partial) {
+function createBill(ownerId, partial) {
   const db = load();
   const id = uid();
   const bill = {
     id,
+    ownerId,
     name:         partial.name || "New bill",
     amount:       parseFloat(partial.amount) || 0,
     currency:     partial.currency || "USD",
@@ -296,20 +313,20 @@ function createBill(partial) {
   return persist().then(() => bill);
 }
 
-function updateBill(id, partial) {
+function updateBill(ownerId, id, partial) {
   const db = load();
   const bill = db.bills[id];
-  if (!bill) return Promise.resolve(null);
+  if (!bill || bill.ownerId !== ownerId) return Promise.resolve(null);
   const fields = ["name","amount","currency","dueDate","frequency","category","autoPay","url","color","notes","reminderDays","paid"];
   fields.forEach(f => { if (f in partial) bill[f] = partial[f]; });
   if (typeof bill.amount === "string") bill.amount = parseFloat(bill.amount) || 0;
   return persist().then(() => bill);
 }
 
-function markBillPaid(id) {
+function markBillPaid(ownerId, id) {
   const db = load();
   const bill = db.bills[id];
-  if (!bill) return Promise.resolve(null);
+  if (!bill || bill.ownerId !== ownerId) return Promise.resolve(null);
   const today = new Date().toISOString().slice(0, 10);
   if (!bill.paidDates) bill.paidDates = [];
   bill.paidDates.unshift(today);
@@ -322,17 +339,18 @@ function markBillPaid(id) {
   return persist().then(() => bill);
 }
 
-function markBillUnpaid(id) {
+function markBillUnpaid(ownerId, id) {
   const db = load();
   const bill = db.bills[id];
-  if (!bill) return Promise.resolve(null);
+  if (!bill || bill.ownerId !== ownerId) return Promise.resolve(null);
   bill.paid = false;
   return persist().then(() => bill);
 }
 
-function deleteBill(id) {
+function deleteBill(ownerId, id) {
   const db = load();
-  if (!db.bills[id]) return Promise.resolve(false);
+  const bill = db.bills[id];
+  if (!bill || bill.ownerId !== ownerId) return Promise.resolve(false);
   delete db.bills[id];
   return persist().then(() => true);
 }
@@ -357,11 +375,37 @@ function removeAllowlistEntry(id) {
   return persist().then(() => true);
 }
 
+// ---------- bills access (admin-granted, per user) ----------
+function listBillsAccess() {
+  const db = load();
+  return Object.values(db.billsAccess).sort((a, b) => a.addedAt - b.addedAt);
+}
+
+function hasBillsAccess(id) {
+  const db = load();
+  return !!db.billsAccess[id];
+}
+
+function grantBillsAccess(id) {
+  const db = load();
+  id = String(id).trim();
+  db.billsAccess[id] = { id, addedAt: Date.now() };
+  return persist().then(() => db.billsAccess[id]);
+}
+
+function revokeBillsAccess(id) {
+  const db = load();
+  if (!db.billsAccess[id]) return Promise.resolve(false);
+  delete db.billsAccess[id];
+  return persist().then(() => true);
+}
+
 module.exports = {
   upsertUser, getUser, updateUserTimezone,
   listCharacters, createCharacter, updateCharacter, deleteCharacter,
   listNotes, getNote, createNote, updateNote, deleteNote, clearNotes,
   listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,
   listBills, getBill, createBill, updateBill, markBillPaid, markBillUnpaid, deleteBill,
-  listAllowlist, addAllowlistEntry, removeAllowlistEntry
+  listAllowlist, addAllowlistEntry, removeAllowlistEntry,
+  listBillsAccess, hasBillsAccess, grantBillsAccess, revokeBillsAccess
 };

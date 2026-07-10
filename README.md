@@ -2,7 +2,7 @@
 
 **A private, Discord-backed notes app for characters, stories, and worldbuilding.**
 
-Ledger started as a simple note-taking tool and has grown into a small self-hosted app with character organization, markdown notes, a calendar, reminders, an admin-only bill scheduler, and Discord integrations — all backed by your own Discord login.
+Ledger started as a simple note-taking tool and has grown into a small self-hosted app with character organization, markdown notes, a calendar, reminders, a personal bill scheduler, and Discord integrations — all backed by your own Discord login.
 
 <p>
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-6DA55F?logo=node.js&logoColor=white">
@@ -41,14 +41,16 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 - Click a day to see everything scheduled for it
 - Create a note directly from a calendar day, due date pre-filled
 
-**Bills** *(admin only)*
+**Bills** *(admin, plus anyone granted access)*
+- Each person with Bills access has their own private bill list — nobody sees anyone else's
 - Track recurring bills — due date, frequency, category, currency
 - Mark paid/unpaid; recurring bills auto-advance to their next due date
 - Bill reminders sent to Discord DMs, same as note reminders
+- Overview dashboard (overdue/upcoming/paid, total due) shown when no bill is selected
 
 **Discord integration**
 - Discord OAuth2 login, with an optional allow-list of approved user IDs
-- Admin-only "Manage access" panel to add or remove allowed Discord accounts from the UI, no redeploy needed
+- Admin-only "Manage access" panel to add or remove allowed Discord accounts, and grant/revoke individual Bills access, all from the UI with no redeploy needed
 - Send any note straight to your own Discord DMs
 - One-time or repeating reminders delivered via DM
 - Per-user timezone support for accurate reminder times
@@ -88,7 +90,7 @@ Fill in the required values:
 | `SESSION_SECRET` | Yes | Random string used to sign session cookies |
 | `ALLOWED_DISCORD_IDS` | No | Comma-separated baseline guest list of approved Discord user IDs — day-to-day changes are easier via the in-app "Manage access" admin panel |
 | `BOT_TOKEN` | No | Enables Send-to-DM and reminder features |
-| `ADMIN_DISCORD_ID` | No | Discord ID granted access to the Bills tab |
+| `ADMIN_DISCORD_ID` | No | Discord ID with site-admin access — Manage Access panel, and their own Bills tab by default |
 | `PORT` | No | Custom port (defaults to 3000) |
 
 Generate a session secret with:

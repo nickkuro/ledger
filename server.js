@@ -120,6 +120,13 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function requireBillsAccess(req, res, next) {
+  if (!req.session.user) return res.status(401).json({ error: "Not logged in" });
+  const id = req.session.user.id;
+  if (id === ADMIN_DISCORD_ID || store.hasBillsAccess(id)) return next();
+  return res.status(403).json({ error: "You don't have access to Bills" });
+}
+
 // ---------- Discord bot helpers ----------
 const DISCORD_API = "https://discord.com/api/v10";
 
@@ -287,7 +294,9 @@ app.post("/auth/logout", (req, res) => {
 
 app.get("/api/me", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "Not logged in" });
-  res.json({ ...req.session.user, isAdmin: req.session.user.id === ADMIN_DISCORD_ID });
+  const isAdmin = req.session.user.id === ADMIN_DISCORD_ID;
+  const canAccessBills = isAdmin || store.hasBillsAccess(req.session.user.id);
+  res.json({ ...req.session.user, isAdmin, canAccessBills });
 });
 
 app.put("/api/me/timezone", requireAuth, async (req, res) => {
@@ -374,55 +383,54 @@ app.delete("/api/reminders/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------- Bills (admin only) ----------
-app.get("/api/bills", requireAdmin, (req, res) => res.json(store.listBills()));
+// ---------- Bills (per-user, gated by bills access) ----------
+app.get("/api/bills", requireBillsAccess, (req, res) => res.json(store.listBills(req.session.user.id)));
 
-app.post("/api/bills", requireAdmin, async (req, res) => {
-  const bill = await store.createBill(req.body || {});
+app.post("/api/bills", requireBillsAccess, async (req, res) => {
+  const bill = await store.createBill(req.session.user.id, req.body || {});
   res.status(201).json(bill);
 });
 
-app.put("/api/bills/:id", requireAdmin, async (req, res) => {
-  const bill = await store.updateBill(req.params.id, req.body || {});
+app.put("/api/bills/:id", requireBillsAccess, async (req, res) => {
+  const bill = await store.updateBill(req.session.user.id, req.params.id, req.body || {});
   if (!bill) return res.status(404).json({ error: "Not found" });
   res.json(bill);
 });
 
-app.post("/api/bills/:id/pay", requireAdmin, async (req, res) => {
-  const bill = await store.markBillPaid(req.params.id);
+app.post("/api/bills/:id/pay", requireBillsAccess, async (req, res) => {
+  const bill = await store.markBillPaid(req.session.user.id, req.params.id);
   if (!bill) return res.status(404).json({ error: "Not found" });
   if (BOT_TOKEN) {
-    const admin = store.getUser(ADMIN_DISCORD_ID);
-    if (admin) sendDM(admin.id, `✅ **${bill.name}** marked as paid. Next due: ${bill.dueDate || "—"}`, { label: "Bill paid" })
+    sendDM(req.session.user.id, `✅ **${bill.name}** marked as paid. Next due: ${bill.dueDate || "—"}`, { label: "Bill paid" })
       .catch(e => console.error("Bill paid DM:", e.message));
   }
   res.json(bill);
 });
 
-app.post("/api/bills/:id/unpay", requireAdmin, async (req, res) => {
-  const bill = await store.markBillUnpaid(req.params.id);
+app.post("/api/bills/:id/unpay", requireBillsAccess, async (req, res) => {
+  const bill = await store.markBillUnpaid(req.session.user.id, req.params.id);
   if (!bill) return res.status(404).json({ error: "Not found" });
   res.json(bill);
 });
 
-app.post("/api/bills/:id/send-dm", requireAdmin, async (req, res) => {
+app.post("/api/bills/:id/send-dm", requireBillsAccess, async (req, res) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: "Bot not configured" });
-  const bill = store.getBill(req.params.id);
+  const bill = store.getBill(req.session.user.id, req.params.id);
   if (!bill) return res.status(404).json({ error: "Not found" });
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = bill.dueDate && bill.dueDate < today && !bill.paid;
   const status = bill.paid ? "✅ Paid" : isOverdue ? "⚠️ Overdue" : "Upcoming";
   const msg = `💳 **${bill.name}**\n\n**Amount:** ${bill.currency} $${Number(bill.amount).toFixed(2)}\n**Due:** ${bill.dueDate || "—"}\n**Status:** ${status}\n**Frequency:** ${bill.frequency}\n**Category:** ${bill.category}${bill.notes ? `\n**Notes:** ${bill.notes}` : ""}`;
   try {
-    await sendDM(ADMIN_DISCORD_ID, msg, { label: "Bill from Ledger", buttonUrl: getAppUrl(), buttonLabel: "View in Ledger" });
+    await sendDM(req.session.user.id, msg, { label: "Bill from Ledger", buttonUrl: getAppUrl(), buttonLabel: "View in Ledger" });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.delete("/api/bills/:id", requireAdmin, async (req, res) => {
-  const ok = await store.deleteBill(req.params.id);
+app.delete("/api/bills/:id", requireBillsAccess, async (req, res) => {
+  const ok = await store.deleteBill(req.session.user.id, req.params.id);
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 });
@@ -459,6 +467,7 @@ app.get("/api/admin/allowlist", requireAdmin, async (req, res) => {
   });
   await Promise.all(result.map(async (entry) => {
     entry.username = await resolveDiscordUsername(entry.id);
+    entry.billsAccess = entry.source === "admin" || store.hasBillsAccess(entry.id);
   }));
   res.json(result);
 });
@@ -475,6 +484,23 @@ app.post("/api/admin/allowlist", requireAdmin, async (req, res) => {
 
 app.delete("/api/admin/allowlist/:id", requireAdmin, async (req, res) => {
   const ok = await store.removeAllowlistEntry(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+// ---------- Bills access grants (admin only) ----------
+app.post("/api/admin/bills-access", requireAdmin, async (req, res) => {
+  const { id } = req.body || {};
+  const trimmed = String(id || "").trim();
+  if (!/^\d{15,20}$/.test(trimmed)) {
+    return res.status(400).json({ error: "Enter a valid Discord user ID (numbers only)." });
+  }
+  const entry = await store.grantBillsAccess(trimmed);
+  res.status(201).json(entry);
+});
+
+app.delete("/api/admin/bills-access/:id", requireAdmin, async (req, res) => {
+  const ok = await store.revokeBillsAccess(req.params.id);
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 });

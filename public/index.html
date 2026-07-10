@@ -428,7 +428,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .modal-field input[type=text]:focus { border-color: var(--accent); outline: none; }
 
 /* manage access modal */
-.access-modal { max-width: 420px; }
+.access-modal { max-width: 460px; }
 .access-add-row { display: flex; gap: 6px; margin-bottom: 14px; }
 .access-add-row input {
   background: var(--surface); border: 1px solid var(--border);
@@ -454,6 +454,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   color: var(--ink-dim); border: 1px solid var(--border); border-radius: 100px; padding: 1px 6px; flex-shrink: 0;
 }
 .access-item-id { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-dim); }
+.access-item-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.access-bills-toggle {
+  display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-dim);
+  font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.04em; cursor: pointer; white-space: nowrap;
+}
+.access-bills-toggle input { cursor: pointer; accent-color: var(--accent); }
+.access-bills-toggle input:disabled { cursor: default; }
 .access-remove-btn {
   flex-shrink: 0; width: 24px; height: 24px; border-radius: 5px;
   display: flex; align-items: center; justify-content: center; color: var(--ink-dim);
@@ -1144,7 +1151,7 @@ kbd {
 <div class="overlay-bg hidden" id="accessOverlay">
   <div class="modal access-modal">
     <div class="modal-title">Manage access</div>
-    <p style="margin-bottom:12px;">Only these Discord accounts can log in. Entries tagged "From env" come from the ALLOWED_DISCORD_IDS environment variable and can only be removed by editing that and redeploying. With no restrictions at all, anyone with Discord can log in.</p>
+    <p style="margin-bottom:12px;">Only these Discord accounts can log in. Entries tagged "From env" come from the ALLOWED_DISCORD_IDS environment variable and can only be removed by editing that and redeploying. With no restrictions at all, anyone with Discord can log in. Check "Bills" to give someone their own private Bills tab.</p>
     <div class="access-add-row">
       <input type="text" id="accessIdInput" placeholder="Discord user ID" />
       <input type="text" id="accessLabelInput" placeholder="Label (optional)" maxlength="64" />
@@ -1281,6 +1288,13 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.4</div>
+          <div class="cl-items">
+            <div class="cl-item new">Bills is no longer admin-only — grant anyone their own private Bills tab from Manage access, separate from your own bills.</div>
+            <div class="cl-item new">Manage access now has a "Bills" toggle per account to grant or revoke that access.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.3.2</div>
           <div class="cl-items">
@@ -1519,6 +1533,7 @@ var state = {
   calReminders: [],
   calAllNotes: {},
   isAdmin: false,
+  canAccessBills: false,
   bills: [],
   selectedBillId: null
 };
@@ -1585,8 +1600,11 @@ function boot() {
   api("/api/me").then(function(user){
     state.user=user;
     state.isAdmin=user.isAdmin===true;
-    if(state.isAdmin){
+    state.canAccessBills=user.canAccessBills===true;
+    if(state.canAccessBills){
       document.getElementById("tabBills").classList.remove("hidden");
+    }
+    if(state.isAdmin){
       document.getElementById("manageAccessBtn").classList.remove("hidden");
     }
     return api("/api/characters");
@@ -2262,16 +2280,24 @@ function accessItemRow(e) {
   var labelRow = (displayName || tag) ? '<div class="access-item-label">'+(displayName?esc(displayName):'')+tag+'</div>' : '';
   var showUsernameInId = e.username && e.username !== displayName;
   var idLine = (showUsernameInId ? esc(e.username)+' · ' : '') + esc(e.id);
+  var billsToggle =
+    '<label class="access-bills-toggle" title="Let this account use its own Bills tab">'+
+      '<input type="checkbox" data-bills-id="'+esc(e.id)+'"'+(e.billsAccess?' checked':'')+(e.source==="admin"?' disabled':'')+' />'+
+      'Bills'+
+    '</label>';
   return '<div class="access-item" data-id="'+esc(e.id)+'">'+
     '<div class="access-item-info">'+
       labelRow+
       '<div class="access-item-id">'+idLine+'</div>'+
     '</div>'+
-    (removable
-      ? '<button class="access-remove-btn" data-remove-id="'+esc(e.id)+'" aria-label="Remove">'+
-          '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'+
-        '</button>'
-      : '')+
+    '<div class="access-item-actions">'+
+      billsToggle+
+      (removable
+        ? '<button class="access-remove-btn" data-remove-id="'+esc(e.id)+'" aria-label="Remove">'+
+            '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'+
+          '</button>'
+        : '')+
+    '</div>'+
   '</div>';
 }
 
@@ -2292,6 +2318,20 @@ function renderAccessList(entries) {
       api("/api/admin/allowlist/"+id,{method:"DELETE"}).then(function(){
         loadAccessList();
         showToast("Removed");
+      });
+    });
+  });
+  list.querySelectorAll("[data-bills-id]").forEach(function(cb){
+    cb.addEventListener("change",function(){
+      var id = cb.getAttribute("data-bills-id");
+      var grant = cb.checked;
+      var req = grant
+        ? api("/api/admin/bills-access",{method:"POST",body:JSON.stringify({id:id})})
+        : api("/api/admin/bills-access/"+id,{method:"DELETE"});
+      req.then(function(){
+        showToast(grant?"Bills access granted":"Bills access removed");
+      }).catch(function(){
+        cb.checked = !grant;
       });
     });
   });
@@ -2606,12 +2646,12 @@ function switchView(view) {
     calMain.classList.remove("hidden");
     document.getElementById("app").classList.add("show-calendar");
     var fetches = [api("/api/notes?characterId=__all__"), api("/api/reminders")];
-    if(state.isAdmin) fetches.push(api("/api/bills"));
+    if(state.canAccessBills) fetches.push(api("/api/bills"));
     Promise.all(fetches).then(function(results){
       state.calAllNotes = {};
       (results[0]||[]).forEach(function(n){ state.calAllNotes[n.id]=n; });
       state.calReminders = results[1]||[];
-      if(state.isAdmin) state.bills = results[2]||[];
+      if(state.canAccessBills) state.bills = results[2]||[];
       renderCalendar();
       renderCalSidePanel(state.calSelected);
     });
@@ -2640,7 +2680,7 @@ function buildEventMap() {
   state.calReminders.forEach(function(r){
     ensure(dayKey(new Date(r.fireAt))).reminders.push(r);
   });
-  if(state.isAdmin){
+  if(state.canAccessBills){
     (state.bills||[]).forEach(function(b){
       if(b.dueDate) ensure(b.dueDate).bills.push(b);
     });
