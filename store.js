@@ -24,6 +24,7 @@ function load() {
   if (!cache.notes) cache.notes = {};
   if (!cache.reminders) cache.reminders = {};
   if (!cache.bills) cache.bills = {};
+  if (!cache.allowlist) cache.allowlist = {};
   return cache;
 }
 
@@ -336,10 +337,31 @@ function deleteBill(id) {
   return persist().then(() => true);
 }
 
+// ---------- allowlist (admin-managed guest list) ----------
+function listAllowlist() {
+  const db = load();
+  return Object.values(db.allowlist).sort((a, b) => a.addedAt - b.addedAt);
+}
+
+function addAllowlistEntry(id, label) {
+  const db = load();
+  id = String(id).trim();
+  db.allowlist[id] = { id, label: (label || "").slice(0, 64), addedAt: Date.now() };
+  return persist().then(() => db.allowlist[id]);
+}
+
+function removeAllowlistEntry(id) {
+  const db = load();
+  if (!db.allowlist[id]) return Promise.resolve(false);
+  delete db.allowlist[id];
+  return persist().then(() => true);
+}
+
 module.exports = {
   upsertUser, getUser, updateUserTimezone,
   listCharacters, createCharacter, updateCharacter, deleteCharacter,
   listNotes, getNote, createNote, updateNote, deleteNote, clearNotes,
   listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,
-  listBills, getBill, createBill, updateBill, markBillPaid, markBillUnpaid, deleteBill
+  listBills, getBill, createBill, updateBill, markBillPaid, markBillUnpaid, deleteBill,
+  listAllowlist, addAllowlistEntry, removeAllowlistEntry
 };

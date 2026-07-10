@@ -426,6 +426,32 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   border-radius: 5px; padding: 7px 9px; font-size: 14px;
 }
 .modal-field input[type=text]:focus { border-color: var(--accent); outline: none; }
+
+/* manage access modal */
+.access-modal { max-width: 420px; }
+.access-add-row { display: flex; gap: 6px; margin-bottom: 14px; }
+.access-add-row input {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 5px; padding: 7px 9px; font-size: 13px; color: var(--ink);
+}
+.access-add-row input:focus { border-color: var(--accent); outline: none; }
+#accessIdInput { flex: 1.2; min-width: 0; }
+#accessLabelInput { flex: 1; min-width: 0; }
+.access-list { max-height: 260px; overflow-y: auto; }
+.access-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); margin-bottom: 6px;
+}
+.access-item-info { min-width: 0; }
+.access-item-label { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.access-item-id { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-dim); }
+.access-remove-btn {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center; color: var(--ink-dim);
+}
+.access-remove-btn:hover { background: var(--border); color: var(--danger); }
+.access-empty { color: var(--ink-dim); font-size: 13px; text-align: center; padding: 16px 0; }
 .color-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .color-swatch {
   width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
@@ -899,6 +925,7 @@ kbd {
         <div class="settings-menu hidden" id="settingsMenu">
           <button id="clearNotesBtn" class="danger">Clear all notes</button>
           <button id="timezoneBtn">Set timezone</button>
+          <button id="manageAccessBtn" class="hidden">Manage access</button>
           <button id="logoutBtn">Log out</button>
         </div>
       </div>
@@ -1105,6 +1132,23 @@ kbd {
   </div>
 </div>
 
+<!-- MANAGE ACCESS MODAL (admin only) -->
+<div class="overlay-bg hidden" id="accessOverlay">
+  <div class="modal access-modal">
+    <div class="modal-title">Manage access</div>
+    <p style="margin-bottom:12px;">Only these Discord accounts can log in. Leave the list empty to allow anyone.</p>
+    <div class="access-add-row">
+      <input type="text" id="accessIdInput" placeholder="Discord user ID" />
+      <input type="text" id="accessLabelInput" placeholder="Label (optional)" maxlength="64" />
+      <button class="btn-primary" id="accessAddBtn">Add</button>
+    </div>
+    <div class="access-list" id="accessList"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn-cancel" id="accessCloseBtn">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL -->
 <div class="overlay-bg hidden" id="confirmOverlay">
   <div class="modal">
@@ -1229,6 +1273,12 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.3</div>
+          <div class="cl-items">
+            <div class="cl-item new">Manage access (admin only) — add or remove Discord accounts allowed to log in, right from the settings menu, no redeploy needed.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.2.3</div>
           <div class="cl-items">
@@ -1517,6 +1567,7 @@ function boot() {
     state.isAdmin=user.isAdmin===true;
     if(state.isAdmin){
       document.getElementById("tabBills").classList.remove("hidden");
+      document.getElementById("manageAccessBtn").classList.remove("hidden");
     }
     return api("/api/characters");
   }).then(function(chars){
@@ -2180,6 +2231,67 @@ document.getElementById("timezoneSave").addEventListener("click",function(){
 });
 document.getElementById("timezoneOverlay").addEventListener("click",function(e){
   if(e.target===this) document.getElementById("timezoneOverlay").classList.add("hidden");
+});
+
+// ---------- Manage access (admin only) ----------
+function renderAccessList(entries) {
+  var list = document.getElementById("accessList");
+  if(!entries.length){
+    list.innerHTML = '<div class="access-empty">No restrictions — anyone with Discord can log in.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(function(e){
+    return '<div class="access-item" data-id="'+esc(e.id)+'">'+
+      '<div class="access-item-info">'+
+        (e.label ? '<div class="access-item-label">'+esc(e.label)+'</div>' : '')+
+        '<div class="access-item-id">'+esc(e.id)+'</div>'+
+      '</div>'+
+      '<button class="access-remove-btn" data-remove-id="'+esc(e.id)+'" aria-label="Remove">'+
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'+
+      '</button>'+
+    '</div>';
+  }).join("");
+  list.querySelectorAll("[data-remove-id]").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var id = btn.getAttribute("data-remove-id");
+      api("/api/admin/allowlist/"+id,{method:"DELETE"}).then(function(){
+        loadAccessList();
+        showToast("Removed");
+      });
+    });
+  });
+}
+
+function loadAccessList() {
+  api("/api/admin/allowlist").then(renderAccessList);
+}
+
+document.getElementById("manageAccessBtn").addEventListener("click",function(){
+  document.getElementById("settingsMenu").classList.add("hidden");
+  document.getElementById("accessIdInput").value="";
+  document.getElementById("accessLabelInput").value="";
+  loadAccessList();
+  document.getElementById("accessOverlay").classList.remove("hidden");
+});
+document.getElementById("accessCloseBtn").addEventListener("click",function(){
+  document.getElementById("accessOverlay").classList.add("hidden");
+});
+document.getElementById("accessOverlay").addEventListener("click",function(e){
+  if(e.target===this) document.getElementById("accessOverlay").classList.add("hidden");
+});
+document.getElementById("accessAddBtn").addEventListener("click",function(){
+  var idInput = document.getElementById("accessIdInput");
+  var labelInput = document.getElementById("accessLabelInput");
+  var id = idInput.value.trim();
+  if(!/^\d{15,20}$/.test(id)){
+    showToast("Enter a valid Discord user ID");
+    return;
+  }
+  api("/api/admin/allowlist",{method:"POST",body:JSON.stringify({id:id,label:labelInput.value.trim()})}).then(function(){
+    idInput.value=""; labelInput.value="";
+    loadAccessList();
+    showToast("Added");
+  }).catch(function(){});
 });
 
 document.getElementById("logoutBtn").addEventListener("click",function(){

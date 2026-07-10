@@ -18,7 +18,14 @@ if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET || !DISCORD_REDIRECT_URI || !SE
   process.exit(1);
 }
 
-const allowlist = (ALLOWED_DISCORD_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
+const envAllowlist = (ALLOWED_DISCORD_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
+
+function isAllowedDiscordId(id) {
+  if (id === ADMIN_DISCORD_ID) return true;
+  const dynamicIds = store.listAllowlist().map((e) => e.id);
+  const effective = envAllowlist.concat(dynamicIds);
+  return !effective.length || effective.includes(id);
+}
 
 const app = express();
 app.set("trust proxy", 1);
@@ -262,7 +269,7 @@ app.get("/auth/discord/callback", authLimiter, async (req, res) => {
     const profileRes = await fetch("https://discord.com/api/users/@me", { headers: { Authorization: `Bearer ${tokenData.access_token}` } });
     if (!profileRes.ok) throw new Error("Could not fetch Discord profile");
     const profile = await profileRes.json();
-    if (allowlist.length && !allowlist.includes(profile.id)) {
+    if (!isAllowedDiscordId(profile.id)) {
       return res.status(403).send("Your Discord account isn't on the guest list for this Ledger.");
     }
     const user = await store.upsertUser(profile);
@@ -416,6 +423,25 @@ app.post("/api/bills/:id/send-dm", requireAdmin, async (req, res) => {
 
 app.delete("/api/bills/:id", requireAdmin, async (req, res) => {
   const ok = await store.deleteBill(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+// ---------- Access allowlist (admin only) ----------
+app.get("/api/admin/allowlist", requireAdmin, (req, res) => res.json(store.listAllowlist()));
+
+app.post("/api/admin/allowlist", requireAdmin, async (req, res) => {
+  const { id, label } = req.body || {};
+  const trimmed = String(id || "").trim();
+  if (!/^\d{15,20}$/.test(trimmed)) {
+    return res.status(400).json({ error: "Enter a valid Discord user ID (numbers only)." });
+  }
+  const entry = await store.addAllowlistEntry(trimmed, label);
+  res.status(201).json(entry);
+});
+
+app.delete("/api/admin/allowlist/:id", requireAdmin, async (req, res) => {
+  const ok = await store.removeAllowlistEntry(req.params.id);
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 });

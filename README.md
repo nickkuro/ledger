@@ -48,6 +48,7 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 
 **Discord integration**
 - Discord OAuth2 login, with an optional allow-list of approved user IDs
+- Admin-only "Manage access" panel to add or remove allowed Discord accounts from the UI, no redeploy needed
 - Send any note straight to your own Discord DMs
 - One-time or repeating reminders delivered via DM
 - Per-user timezone support for accurate reminder times
@@ -85,7 +86,7 @@ Fill in the required values:
 | `DISCORD_CLIENT_SECRET` | Yes | From the Discord Developer Portal |
 | `DISCORD_REDIRECT_URI` | Yes | Must exactly match a registered redirect |
 | `SESSION_SECRET` | Yes | Random string used to sign session cookies |
-| `ALLOWED_DISCORD_IDS` | No | Comma-separated guest list of approved Discord user IDs |
+| `ALLOWED_DISCORD_IDS` | No | Comma-separated baseline guest list of approved Discord user IDs — day-to-day changes are easier via the in-app "Manage access" admin panel |
 | `BOT_TOKEN` | No | Enables Send-to-DM and reminder features |
 | `ADMIN_DISCORD_ID` | No | Discord ID granted access to the Bills tab |
 | `PORT` | No | Custom port (defaults to 3000) |
