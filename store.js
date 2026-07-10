@@ -11,7 +11,10 @@ let writeQueue = Promise.resolve();
 function ensureFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ users: {}, characters: {}, notes: {}, reminders: {} }, null, 2));
+    fs.writeFileSync(DATA_FILE, JSON.stringify({
+      users: {}, characters: {}, notes: {}, reminders: {},
+      bills: {}, allowlist: {}, billsAccess: {}
+    }, null, 2));
   }
 }
 
@@ -249,24 +252,40 @@ function rescheduleReminder(id, intervalMs) {
   return persist().then(() => r);
 }
 
-function deleteReminder(id) {
+function deleteReminder(ownerId, id) {
   const db = load();
-  if (!db.reminders[id]) return Promise.resolve(false);
+  const r = db.reminders[id];
+  if (!r || r.ownerId !== ownerId) return Promise.resolve(false);
   delete db.reminders[id];
   return persist().then(() => true);
 }
 
 // ---------- bills (per-user, gated by bills access) ----------
+function dateToStr(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+// Adds calendar months while clamping to the target month's last day,
+// so e.g. Jan 31 + 1 month lands on Feb 28/29, not overflowing into March.
+function addMonthsClamped(d, months) {
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, daysInMonth));
+  return d;
+}
+
 function advanceDueDate(dateStr, frequency) {
   const d = new Date(dateStr + "T00:00:00");
   switch (frequency) {
     case "weekly":    d.setDate(d.getDate() + 7); break;
     case "biweekly":  d.setDate(d.getDate() + 14); break;
-    case "monthly":   d.setMonth(d.getMonth() + 1); break;
-    case "quarterly": d.setMonth(d.getMonth() + 3); break;
+    case "monthly":   addMonthsClamped(d, 1); break;
+    case "quarterly": addMonthsClamped(d, 3); break;
     case "yearly":    d.setFullYear(d.getFullYear() + 1); break;
   }
-  return d.toISOString().slice(0, 10);
+  return dateToStr(d);
 }
 
 function listBills(ownerId) {
@@ -307,6 +326,7 @@ function createBill(ownerId, partial) {
     reminderDays: partial.reminderDays != null ? Number(partial.reminderDays) : null,
     paid:         false,
     paidDates:    [],
+    lastReminderSent: null,
     createdAt:    Date.now()
   };
   db.bills[id] = bill;
@@ -317,7 +337,9 @@ function updateBill(ownerId, id, partial) {
   const db = load();
   const bill = db.bills[id];
   if (!bill || bill.ownerId !== ownerId) return Promise.resolve(null);
-  const fields = ["name","amount","currency","dueDate","frequency","category","autoPay","url","color","notes","reminderDays","paid"];
+  // "paid" is intentionally excluded -- it's only mutated via markBillPaid/markBillUnpaid,
+  // which also keep paidDates and dueDate advancement in sync.
+  const fields = ["name","amount","currency","dueDate","frequency","category","autoPay","url","color","notes","reminderDays"];
   fields.forEach(f => { if (f in partial) bill[f] = partial[f]; });
   if (typeof bill.amount === "string") bill.amount = parseFloat(bill.amount) || 0;
   return persist().then(() => bill);
@@ -327,7 +349,7 @@ function markBillPaid(ownerId, id) {
   const db = load();
   const bill = db.bills[id];
   if (!bill || bill.ownerId !== ownerId) return Promise.resolve(null);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToStr(new Date());
   if (!bill.paidDates) bill.paidDates = [];
   bill.paidDates.unshift(today);
   if (bill.frequency === "one-time") {
@@ -353,6 +375,20 @@ function deleteBill(ownerId, id) {
   if (!bill || bill.ownerId !== ownerId) return Promise.resolve(false);
   delete db.bills[id];
   return persist().then(() => true);
+}
+
+// Internal-only: unscoped by owner, used by the server's bill-reminder job.
+function getAllBills() {
+  const db = load();
+  return Object.values(db.bills);
+}
+
+function markBillReminderSent(id, dateStr) {
+  const db = load();
+  const bill = db.bills[id];
+  if (!bill) return Promise.resolve(null);
+  bill.lastReminderSent = dateStr;
+  return persist().then(() => bill);
 }
 
 // ---------- allowlist (admin-managed guest list) ----------
@@ -406,6 +442,7 @@ module.exports = {
   listNotes, getNote, createNote, updateNote, deleteNote, clearNotes,
   listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,
   listBills, getBill, createBill, updateBill, markBillPaid, markBillUnpaid, deleteBill,
+  getAllBills, markBillReminderSent,
   listAllowlist, addAllowlistEntry, removeAllowlistEntry,
   listBillsAccess, hasBillsAccess, grantBillsAccess, revokeBillsAccess
 };

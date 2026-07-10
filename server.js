@@ -104,6 +104,9 @@ const apiLimiter = rateLimit({
   limit: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  // Key by logged-in user when possible, so people sharing an IP/network
+  // (e.g. two housemates both using Bills) don't throttle each other.
+  keyGenerator: (req) => (req.session && req.session.user) ? `user:${req.session.user.id}` : req.ip,
   message: { error: "Too many requests. Slow down and try again in a minute." }
 });
 
@@ -242,10 +245,40 @@ function startReminderJob() {
       if (reminder.repeat && reminder.repeatInterval) {
         await store.rescheduleReminder(reminder.id, reminder.repeatInterval);
       } else {
-        await store.deleteReminder(reminder.id);
+        await store.deleteReminder(reminder.ownerId, reminder.id);
       }
     }
   }, 30000);
+}
+
+// ---------- Bill due-date reminder job ----------
+function dateToStr(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function startBillReminderJob() {
+  setInterval(async () => {
+    const todayStr = dateToStr(new Date());
+    const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+    for (const bill of store.getAllBills()) {
+      if (bill.paid || !bill.dueDate || bill.reminderDays == null) continue;
+      if (bill.lastReminderSent === todayStr) continue;
+      const due = new Date(bill.dueDate + "T00:00:00");
+      const daysUntilDue = Math.round((due - todayMidnight) / 86400000);
+      if (daysUntilDue !== Number(bill.reminderDays)) continue;
+      try {
+        const dayWord = daysUntilDue === 1 ? "day" : "days";
+        await sendDM(
+          bill.ownerId,
+          `💳 **${bill.name}** is due in ${daysUntilDue} ${dayWord} (${bill.dueDate}) — ${bill.currency} $${Number(bill.amount).toFixed(2)}`,
+          { label: "Bill reminder", buttonUrl: getAppUrl(), buttonLabel: "View in Ledger" }
+        );
+      } catch (err) {
+        console.error("Bill reminder DM failed:", err.message);
+      }
+      await store.markBillReminderSent(bill.id, todayStr);
+    }
+  }, 15 * 60 * 1000);
 }
 
 // ---------- Discord OAuth2 ----------
@@ -378,7 +411,7 @@ app.post("/api/reminders", requireAuth, async (req, res) => {
   res.status(201).json(reminder);
 });
 app.delete("/api/reminders/:id", requireAuth, async (req, res) => {
-  const ok = await store.deleteReminder(req.params.id);
+  const ok = await store.deleteReminder(req.session.user.id, req.params.id);
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 });
@@ -417,7 +450,7 @@ app.post("/api/bills/:id/send-dm", requireBillsAccess, async (req, res) => {
   if (!BOT_TOKEN) return res.status(503).json({ error: "Bot not configured" });
   const bill = store.getBill(req.session.user.id, req.params.id);
   if (!bill) return res.status(404).json({ error: "Not found" });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToStr(new Date());
   const isOverdue = bill.dueDate && bill.dueDate < today && !bill.paid;
   const status = bill.paid ? "✅ Paid" : isOverdue ? "⚠️ Overdue" : "Upcoming";
   const msg = `💳 **${bill.name}**\n\n**Amount:** ${bill.currency} $${Number(bill.amount).toFixed(2)}\n**Due:** ${bill.dueDate || "—"}\n**Status:** ${status}\n**Frequency:** ${bill.frequency}\n**Category:** ${bill.category}${bill.notes ? `\n**Notes:** ${bill.notes}` : ""}`;
@@ -513,7 +546,8 @@ app.listen(port, () => {
   console.log(`Ledger running on http://localhost:${port}`);
   if (BOT_TOKEN) {
     startReminderJob();
-    console.log("Reminder job started.");
+    startBillReminderJob();
+    console.log("Reminder jobs started.");
   } else {
     console.log("No BOT_TOKEN — DM and reminder features disabled.");
   }

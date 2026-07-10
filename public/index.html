@@ -780,6 +780,14 @@ kbd {
 .bill-amount-row { display: flex; gap: 8px; }
 .bill-amount-row input { flex: 1; }
 .bill-amount-row select { width: 80px; flex-shrink: 0; }
+.bill-url-row { display: flex; gap: 6px; }
+.bill-url-row input { flex: 1; }
+.bill-url-open {
+  flex-shrink: 0; width: 32px; display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--ink-mid); text-decoration: none; font-size: 15px;
+}
+.bill-url-open:hover { color: var(--accent); border-color: var(--accent); }
 .bill-toggle-row { display: flex; align-items: center; gap: 10px; }
 .bill-toggle-row label { font-size: 13px; color: var(--ink-mid); cursor: pointer; font-family: inherit; text-transform: none; letter-spacing: 0; }
 .bill-toggle-row input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
@@ -1288,6 +1296,15 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.5</div>
+          <div class="cl-items">
+            <div class="cl-item fix">Tightened up reminder cleanup behind the scenes.</div>
+            <div class="cl-item fix">Recurring bills due on the 29th–31st no longer drift into the wrong month over time.</div>
+            <div class="cl-item new">"Remind me (days before)" on bills now actually sends a Discord DM reminder ahead of the due date — previously it did nothing.</div>
+            <div class="cl-item new">Bill URLs now show an open-link button when set.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.4</div>
           <div class="cl-items">
@@ -3188,7 +3205,12 @@ function renderBillEditor() {
         '<div class="bill-field"><label>Frequency</label><select id="billFrequency">'+freqOptions+'</select></div>'+
         '<div class="bill-field"><label>Category</label><select id="billCategory">'+catOptions+'</select></div>'+
         '<div class="bill-field"><label>Website / URL</label>'+
-          '<input type="url" id="billUrl" placeholder="https://…" value="'+esc(bill.url||"")+'" /></div>'+
+          '<div class="bill-url-row">'+
+            '<input type="url" id="billUrl" placeholder="https://…" value="'+esc(bill.url||"")+'" />'+
+            (bill.url && /^https?:\/\//i.test(bill.url)
+              ? '<a class="bill-url-open" href="'+esc(bill.url)+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>'
+              : '')+
+          '</div></div>'+
         '<div class="bill-field"><label>Remind me (days before)</label>'+
           '<input type="number" id="billReminderDays" min="0" max="30" placeholder="e.g. 3" value="'+(bill.reminderDays!=null?bill.reminderDays:"")+'" /></div>'+
         '<div class="bill-field full"><label>Auto-pay</label>'+
