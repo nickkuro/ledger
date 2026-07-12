@@ -35,6 +35,7 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 - Sticky notes that stay pinned across every character view
 - Tags, full-text search, and filtered note views
 - Inline image embedding
+- One-step "previous version" safety net — restore a note's content from right before the last save if an accidental paste-over gets autosaved
 
 **Calendar**
 - Month and week views of due notes, reminders, and bills
@@ -43,11 +44,13 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 
 **Bills** *(admin, plus anyone granted access)*
 - Each person with Bills access has their own private bill list — nobody sees anyone else's
-- Track recurring bills — due date, frequency, category, currency
+- Track recurring bills — due date, frequency, category, currency, and a Low/Medium/High/Urgent priority (which also sets the bill's colour)
 - Mark paid/unpaid; recurring bills auto-advance to their next due date
 - Bill reminders sent to Discord DMs, same as note reminders
-- Overview dashboard (overdue/upcoming/paid, total due) shown when no bill is selected
+- Overview dashboard (overdue/upcoming/paid, outstanding bills) shown when no bill is selected, with same-day bills sorted by priority
 - 12-month bill forecast — a real month-by-month projection of what's actually due, plus a yearly total, based on each bill's actual future due dates
+- "How is this calculated?" breakdown showing exactly which bills (and how many times each) make up the totals
+- Spend-by-category breakdown and a payment history section based on what's actually been paid
 - Estimated monthly income input on the dashboard, with a live left-over/short-by comparison against what's due this month
 
 **Discord integration**
@@ -56,6 +59,11 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 - Send any note straight to your own Discord DMs
 - One-time or repeating reminders delivered via DM
 - Per-user timezone support for accurate reminder times
+
+**Your data**
+- Export — download all your notes, characters, reminders, and bills as a single JSON file, any time, from the settings menu
+- Remove — permanently delete everything on your account (notes, characters, reminders, bills) yourself, with a confirmation step, no need to ask an admin
+- Installable as a mobile app (Add to Home Screen on Android or iOS Safari) via a web app manifest and service worker
 
 **Look & feel**
 - Dark/light theme

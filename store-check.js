@@ -133,6 +133,40 @@ async function checkAllowlistAndBillsAccess() {
   assert.equal(store.hasBillsAccess(id), false);
 }
 
+async function checkDeleteAllUserData() {
+  const ownerA = `store-check-wipe-a-${Date.now()}`;
+  const ownerB = `store-check-wipe-b-${Date.now()}`;
+
+  await store.upsertUser({ id: ownerA, username: 'Wipe Me', avatar: null });
+  await store.updateUserTimezone(ownerA, 'America/New_York');
+  await store.updateUserIncome(ownerA, 4200, 'USD');
+
+  const character = await store.createCharacter(ownerA, { name: 'Doomed', color: '#c9605a' });
+  const note = await store.createNote(ownerA, { title: 'Gone soon', body: 'bye', characterId: character.id });
+  await store.createReminder(ownerA, { noteId: note.id, fireAt: Date.now() + 60000 });
+  const bill = await store.createBill(ownerA, { name: 'Doomed bill', amount: 10, dueDate: '2026-09-01', frequency: 'monthly' });
+
+  const otherCharacter = await store.createCharacter(ownerB, { name: 'Safe', color: '#4fa8a0' });
+  const otherNote = await store.createNote(ownerB, { title: 'Should survive', body: 'still here', characterId: otherCharacter.id });
+
+  await store.deleteAllUserData(ownerA);
+
+  assert.deepEqual(await store.listCharacters(ownerA), [], 'characters should be wiped');
+  assert.deepEqual(await store.listNotes(ownerA, '__all__'), [], 'notes should be wiped');
+  assert.deepEqual(await store.listReminders(ownerA), [], 'reminders should be wiped');
+  assert.deepEqual(await store.listBills(ownerA), [], 'bills should be wiped');
+
+  const wipedUser = store.getUser(ownerA);
+  assert.equal(wipedUser.timezone, null, 'timezone preference should be reset');
+  assert.equal(wipedUser.incomeEstimate, null, 'income estimate should be reset');
+  assert.equal(wipedUser.incomeCurrency, null, 'income currency should be reset');
+
+  assert.ok((await store.listCharacters(ownerB)).some((c) => c.id === otherCharacter.id), 'another owner\'s characters must survive');
+  assert.ok((await store.listNotes(ownerB, '__all__')).some((n) => n.id === otherNote.id), 'another owner\'s notes must survive');
+
+  await store.deleteCharacter(ownerB, otherCharacter.id);
+}
+
 async function runStoreCheck() {
   await checkNotesAndCharacters();
   await checkReminderOwnership();
@@ -140,6 +174,7 @@ async function runStoreCheck() {
   await checkBillOwnershipAndDueDateRollover();
   await checkBillPriorityColorAndSorting();
   await checkAllowlistAndBillsAccess();
+  await checkDeleteAllUserData();
   console.log('Store check passed.');
 }
 

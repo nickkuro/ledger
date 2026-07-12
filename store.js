@@ -398,6 +398,19 @@ async function updateUserIncome(id, amount, currency) {
   return rowToUser({ ...existing, incomeEstimate, incomeCurrency });
 }
 
+// Self-service "remove my data" -- wipes everything owned by this account
+// (characters, notes, reminders, bills) and resets stored preferences.
+// Does not touch the allowlist/billsAccess grant or the account row itself,
+// so the user can still log back in with a clean slate.
+async function deleteAllUserData(id) {
+  db.prepare("DELETE FROM notes WHERE ownerId = :ownerId").run({ ownerId: id });
+  db.prepare("DELETE FROM characters WHERE ownerId = :ownerId").run({ ownerId: id });
+  db.prepare("DELETE FROM reminders WHERE ownerId = :ownerId").run({ ownerId: id });
+  db.prepare("DELETE FROM bills WHERE ownerId = :ownerId").run({ ownerId: id });
+  db.prepare("UPDATE users SET timezone = NULL, incomeEstimate = NULL, incomeCurrency = NULL WHERE id = :id")
+    .run({ id });
+}
+
 // ---------- characters ----------
 function listCharacters(ownerId) {
   return db.prepare("SELECT * FROM characters WHERE ownerId = :ownerId").all({ ownerId })
@@ -816,7 +829,7 @@ async function revokeBillsAccess(id) {
 }
 
 module.exports = {
-  upsertUser, getUser, updateUserTimezone, updateUserIncome,
+  upsertUser, getUser, updateUserTimezone, updateUserIncome, deleteAllUserData,
   listCharacters, createCharacter, updateCharacter, deleteCharacter,
   listNotes, getNote, createNote, updateNote, deleteNote, clearNotes, restorePreviousVersion,
   listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,

@@ -371,6 +371,11 @@ app.get("/api/me/export", requireAuth, (req, res) => {
   res.json(data);
 });
 
+app.post("/api/me/delete-data", requireAuth, async (req, res) => {
+  await store.deleteAllUserData(req.session.user.id);
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
 app.use("/api", apiLimiter);
 
 // ---------- Characters ----------

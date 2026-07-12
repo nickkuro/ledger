@@ -1009,6 +1009,7 @@ kbd {
           <button id="clearNotesBtn" class="danger">Clear all notes</button>
           <button id="timezoneBtn">Set timezone</button>
           <button id="exportDataBtn">Export my data</button>
+          <button id="removeMyDataBtn" class="danger">Remove my data</button>
           <button id="manageAccessBtn" class="hidden">Manage access</button>
           <button id="logoutBtn">Log out</button>
         </div>
@@ -1277,7 +1278,7 @@ kbd {
     <div class="info-panel" id="tab-about">
       <div class="info-section">
         <div class="info-logo">¶ LEDGER</div>
-        <p class="info-sub">Version 2.9 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
+        <p class="info-sub">Version 2.10 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
       </div>
       <div class="info-section">
         <div class="info-heading">How it works</div>
@@ -1342,6 +1343,10 @@ kbd {
           <div class="info-item-body">From the settings menu, download all your notes, characters, reminders, and bills as a single JSON file for your own backup.</div>
         </div>
         <div class="info-item">
+          <div class="info-item-title">Remove my data</div>
+          <div class="info-item-body">From the settings menu, permanently delete every note, character, reminder, and bill on your account, with a confirmation step first. You're logged out afterward and can log back in with a clean slate whenever you like.</div>
+        </div>
+        <div class="info-item">
           <div class="info-item-title">Install as an app</div>
           <div class="info-item-body">Ledger can be added to your phone's home screen (Add to Home Screen on Android or iOS Safari) and opens like a native app.</div>
         </div>
@@ -1380,6 +1385,12 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.10</div>
+          <div class="cl-items">
+            <div class="cl-item new">Added a "Remove my data" option in Settings — permanently deletes every note, character, reminder, and bill on your account (with a confirmation step), and logs you out afterward.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.9</div>
           <div class="cl-items">
@@ -2446,6 +2457,17 @@ document.getElementById("exportDataBtn").addEventListener("click",function(){
   document.body.removeChild(a);
 });
 
+document.getElementById("removeMyDataBtn").addEventListener("click",function(){
+  document.getElementById("settingsMenu").classList.add("hidden");
+  openConfirm("Permanently delete ALL your data — every note, character, reminder, and bill? This can't be undone, and you'll be logged out afterward.",{type:"removeMyData"});
+});
+
+function removeMyData() {
+  api("/api/me/delete-data",{method:"POST"}).then(function(){
+    window.location.reload();
+  });
+}
+
 // ---------- Manage access (admin only) ----------
 function accessItemRow(e) {
   var removable = e.source === "dynamic";
@@ -2690,6 +2712,11 @@ document.getElementById("confirmOk").addEventListener("click",function(){
   else if(pendingAction.type==="clearNotes") clearNotes();
   else if(pendingAction.type==="deleteChar") deleteCharacter(pendingAction.id);
   else if(pendingAction.type==="restoreNote") restoreNoteVersion(pendingAction.id);
+  else if(pendingAction.type==="removeMyData"){
+    closeConfirm();
+    removeMyData();
+    return;
+  }
   else if(pendingAction.type==="deleteBill"){
     var billId=pendingAction.id;
     closeConfirm();
