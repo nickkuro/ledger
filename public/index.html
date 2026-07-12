@@ -785,6 +785,25 @@ kbd {
 .bill-dash-net { font-size: 12.5px; color: var(--ink-dim); margin-top: 10px; min-height: 1em; }
 .bill-dash-net.positive { color: var(--green); }
 .bill-dash-net.negative { color: var(--danger); }
+.bill-dash-toggle {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  background: none; color: var(--ink-mid); font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em; padding: 4px 0;
+}
+.bill-dash-toggle:hover { color: var(--ink); }
+.bill-dash-toggle-icon { transition: transform 0.15s ease; flex-shrink: 0; }
+.bill-dash-toggle.open .bill-dash-toggle-icon { transform: rotate(180deg); }
+.bill-dash-breakdown { margin-top: 12px; }
+.bill-dash-breakdown-group { margin-bottom: 18px; }
+.bill-dash-breakdown-group:last-child { margin-bottom: 0; }
+.bill-dash-breakdown-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px;
+}
+.bill-dash-breakdown-name { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bill-dash-breakdown-freq { color: var(--ink-dim); font-size: 11px; }
+.bill-dash-breakdown-calc { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--ink-mid); flex-shrink: 0; }
+.bill-dash-breakdown-total { text-align: right; font-weight: 600; font-size: 12.5px; padding-top: 8px; color: var(--ink); }
 .bill-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .bill-editor-head { padding: 14px 26px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .bill-editor-toprow { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -1327,6 +1346,12 @@ kbd {
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
         <div class="cl-entry">
+          <div class="cl-version">v2.9</div>
+          <div class="cl-items">
+            <div class="cl-item new">Added a "How is this calculated?" breakdown to the Bills dashboard — shows exactly which bills (and how many times each) make up this month's and the next 12 months' totals.</div>
+          </div>
+        </div>
+        <div class="cl-entry">
           <div class="cl-version">v2.8</div>
           <div class="cl-items">
             <div class="cl-item fix">Switched the data layer to a proper embedded database for better reliability as things grow. Existing data migrates over automatically and safely — nothing to do on your end.</div>
@@ -1602,7 +1627,8 @@ var state = {
   isAdmin: false,
   canAccessBills: false,
   bills: [],
-  selectedBillId: null
+  selectedBillId: null,
+  billMathOpen: false
 };
 
 var saveTimers = {};
@@ -3207,6 +3233,47 @@ function buildBillForecast(bills, monthsAhead) {
   return monthKeys.map(function(mk){ return { month: mk, totals: totals[mk] }; });
 }
 
+// Same walk as buildBillForecast, but keeps a per-bill occurrence count
+// instead of collapsing into a currency total -- powers the "how is this
+// calculated" breakdown so it can never drift out of sync with the totals.
+function buildBillBreakdown(bills, monthsAhead) {
+  var today = new Date(); today.setHours(0,0,0,0);
+  var monthKeys = [];
+  for(var i=0;i<monthsAhead;i++){
+    var d = new Date(today.getFullYear(), today.getMonth()+i, 1);
+    monthKeys.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));
+  }
+  var thisMonthKey = monthKeys[0];
+  var horizonEnd = monthKeys[monthKeys.length-1];
+
+  var thisMonthRows = [], yearRows = [];
+
+  bills.forEach(function(b){
+    if(!b.dueDate) return;
+    var thisMonthCount = 0, yearCount = 0;
+    if(b.frequency === "one-time"){
+      if(!b.paid){
+        if(b.dueDate.slice(0,7) === thisMonthKey) thisMonthCount = 1;
+        if(b.dueDate.slice(0,7) <= horizonEnd) yearCount = 1;
+      }
+    } else {
+      var cursor = b.dueDate;
+      var guard = 0;
+      while(cursor && cursor.slice(0,7) <= horizonEnd && guard < 80){
+        guard++;
+        if(cursor.slice(0,7) === thisMonthKey) thisMonthCount++;
+        yearCount++;
+        cursor = advanceDueDateClient(cursor, b.frequency);
+      }
+    }
+    var amt = Number(b.amount)||0;
+    if(thisMonthCount>0) thisMonthRows.push({ bill:b, count:thisMonthCount, subtotal: thisMonthCount*amt });
+    if(yearCount>0) yearRows.push({ bill:b, count:yearCount, subtotal: yearCount*amt });
+  });
+
+  return { thisMonthKey: thisMonthKey, thisMonthRows: thisMonthRows, yearRows: yearRows };
+}
+
 function forecastMonthLabel(monthKey){
   var parts = monthKey.split("-");
   return FORECAST_MONTH_NAMES[Number(parts[1])-1] + " " + parts[0];
@@ -3291,6 +3358,42 @@ function renderBillDashboard() {
     '</div>';
   }
 
+  function breakdownRow(entry){
+    var amt = Number(entry.bill.amount);
+    var calc = entry.count > 1
+      ? entry.count+' × '+entry.bill.currency+' $'+amt.toFixed(2)+' = '+entry.bill.currency+' $'+entry.subtotal.toFixed(2)
+      : entry.bill.currency+' $'+entry.subtotal.toFixed(2);
+    return '<div class="bill-dash-breakdown-row">'+
+      '<span class="bill-dash-breakdown-name">'+esc(entry.bill.name)+' <span class="bill-dash-breakdown-freq">('+entry.bill.frequency+')</span></span>'+
+      '<span class="bill-dash-breakdown-calc">'+calc+'</span>'+
+    '</div>';
+  }
+
+  function breakdownGroup(title, rows){
+    if(!rows.length) return '<div class="bill-dash-breakdown-group"><div class="bill-dash-heading">'+title+'</div><div class="bill-dash-empty">Nothing contributing.</div></div>';
+    var totals = {};
+    rows.forEach(function(r){ totals[r.bill.currency] = (totals[r.bill.currency]||0) + r.subtotal; });
+    return '<div class="bill-dash-breakdown-group">'+
+      '<div class="bill-dash-heading">'+title+'</div>'+
+      rows.map(breakdownRow).join("")+
+      '<div class="bill-dash-breakdown-total">Total: '+forecastTotalsLine(totals)+'</div>'+
+    '</div>';
+  }
+
+  var breakdown = buildBillBreakdown(state.bills, 12);
+  var breakdownHtml = state.bills.length
+    ? '<div class="bill-dash-section">'+
+        '<button class="bill-dash-toggle'+(state.billMathOpen?" open":"")+'" id="billMathToggle">'+
+          '<span>How is this calculated?</span>'+
+          '<svg class="bill-dash-toggle-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'+
+        '</button>'+
+        '<div class="bill-dash-breakdown'+(state.billMathOpen?"":" hidden")+'" id="billMathBody">'+
+          breakdownGroup("This month ("+forecastMonthLabel(breakdown.thisMonthKey)+")", breakdown.thisMonthRows)+
+          breakdownGroup("Next 12 months", breakdown.yearRows)+
+        '</div>'+
+      '</div>'
+    : "";
+
   var incomeAmount = state.user && state.user.incomeEstimate;
   var incomeCurrency = (state.user && state.user.incomeCurrency) || "USD";
   var incomeCurrencyOptions = BILL_CURRENCIES.map(function(c){
@@ -3320,7 +3423,8 @@ function renderBillDashboard() {
         '<select id="incomeCurrencyInput">'+incomeCurrencyOptions+'</select>'+
       '</div>'+
       '<div class="bill-dash-net" id="incomeNetLine"></div>'+
-    '</div>';
+    '</div>'+
+    breakdownHtml;
 
   el.querySelectorAll(".bill-dash-item").forEach(function(item){
     item.addEventListener("click", function(){
@@ -3328,6 +3432,15 @@ function renderBillDashboard() {
       renderBillList();
     });
   });
+
+  var billMathToggle = document.getElementById("billMathToggle");
+  if(billMathToggle){
+    billMathToggle.addEventListener("click", function(){
+      state.billMathOpen = !state.billMathOpen;
+      billMathToggle.classList.toggle("open", state.billMathOpen);
+      document.getElementById("billMathBody").classList.toggle("hidden", !state.billMathOpen);
+    });
+  }
 
   var incomeSaveTimer = null;
   document.getElementById("incomeAmountInput").addEventListener("input", function(e){
