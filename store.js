@@ -1,6 +1,7 @@
 // store.js
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { DatabaseSync } = require("node:sqlite");
 
 const DATA_DIR = path.join(__dirname, "data");
@@ -20,7 +21,10 @@ CREATE TABLE IF NOT EXISTS users (
   timezone TEXT,
   incomeEstimate REAL,
   incomeCurrency TEXT,
-  updatedAt INTEGER
+  updatedAt INTEGER,
+  passwordHash TEXT,
+  authType TEXT DEFAULT 'discord',
+  mustChangePassword INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS characters (
@@ -123,6 +127,11 @@ function ensureSchemaUpToDate(handle) {
   // priority is backfilled (defaults every existing row to 'medium').
   // Color only gets recomputed from priority the next time it's changed.
   ensureColumn(handle, "bills", "priority", "TEXT DEFAULT 'medium'");
+  // Existing (Discord) users backfill to authType='discord', passwordHash
+  // stays NULL, mustChangePassword stays 0 -- none of that affects login.
+  ensureColumn(handle, "users", "passwordHash", "TEXT");
+  ensureColumn(handle, "users", "authType", "TEXT DEFAULT 'discord'");
+  ensureColumn(handle, "users", "mustChangePassword", "INTEGER DEFAULT 0");
 }
 
 // Migrates a legacy data/db.json into the (already schema-created) handle.
@@ -306,7 +315,8 @@ function rowToUser(row) {
   if (!row) return null;
   return {
     id: row.id, username: row.username, avatar: row.avatar, timezone: row.timezone,
-    incomeEstimate: row.incomeEstimate, incomeCurrency: row.incomeCurrency, updatedAt: row.updatedAt
+    incomeEstimate: row.incomeEstimate, incomeCurrency: row.incomeCurrency, updatedAt: row.updatedAt,
+    authType: row.authType || "discord", mustChangePassword: !!row.mustChangePassword
   };
 }
 
@@ -409,6 +419,78 @@ async function deleteAllUserData(id) {
   db.prepare("DELETE FROM bills WHERE ownerId = :ownerId").run({ ownerId: id });
   db.prepare("UPDATE users SET timezone = NULL, incomeEstimate = NULL, incomeCurrency = NULL WHERE id = :id")
     .run({ id });
+}
+
+// ---------- local (non-Discord) accounts ----------
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPasswordAgainstHash(password, stored) {
+  if (!stored) return false;
+  const [salt, hashHex] = stored.split(":");
+  if (!salt || !hashHex) return false;
+  const expected = Buffer.from(hashHex, "hex");
+  const actual = crypto.scryptSync(password, salt, 64);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+async function createLocalAccount(username, password) {
+  const trimmed = String(username || "").trim();
+  const existing = db.prepare("SELECT id FROM users WHERE authType = 'local' AND LOWER(username) = LOWER(:username)")
+    .get({ username: trimmed });
+  if (existing) throw new Error("That username is already taken.");
+  const id = "local_" + uid();
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO users (id, username, avatar, timezone, incomeEstimate, incomeCurrency, updatedAt, passwordHash, authType, mustChangePassword)
+     VALUES (:id, :username, NULL, NULL, NULL, NULL, :updatedAt, :passwordHash, 'local', 1)`
+  ).run({ id, username: trimmed, updatedAt: now, passwordHash: hashPassword(password) });
+  return rowToUser(db.prepare("SELECT * FROM users WHERE id = :id").get({ id }));
+}
+
+function listLocalAccounts() {
+  return db.prepare("SELECT * FROM users WHERE authType = 'local'").all()
+    .map(rowToUser)
+    .sort((a, b) => (a.username || "").localeCompare(b.username || ""));
+}
+
+function verifyLocalLogin(username, password) {
+  const row = db.prepare("SELECT * FROM users WHERE authType = 'local' AND LOWER(username) = LOWER(:username)")
+    .get({ username: String(username || "").trim() });
+  if (!row || !verifyPasswordAgainstHash(password, row.passwordHash)) return null;
+  return rowToUser(row);
+}
+
+async function changeOwnPassword(id, currentPassword, newPassword) {
+  const row = db.prepare("SELECT * FROM users WHERE id = :id AND authType = 'local'").get({ id });
+  if (!row) return false;
+  if (!verifyPasswordAgainstHash(currentPassword, row.passwordHash)) return false;
+  db.prepare("UPDATE users SET passwordHash = :passwordHash, mustChangePassword = 0 WHERE id = :id")
+    .run({ id, passwordHash: hashPassword(newPassword) });
+  return true;
+}
+
+async function adminResetPassword(id, newPassword) {
+  const row = db.prepare("SELECT * FROM users WHERE id = :id AND authType = 'local'").get({ id });
+  if (!row) return null;
+  db.prepare("UPDATE users SET passwordHash = :passwordHash, mustChangePassword = 1 WHERE id = :id")
+    .run({ id, passwordHash: hashPassword(newPassword) });
+  return rowToUser({ ...row, mustChangePassword: 1 });
+}
+
+// Fully removes a local account: unlike the self-service "remove my data"
+// flow, there's no external (Discord) identity left behind to preserve, so
+// this also deletes the account row itself and any Bills-access grant.
+async function deleteLocalAccount(id) {
+  const row = db.prepare("SELECT id FROM users WHERE id = :id AND authType = 'local'").get({ id });
+  if (!row) return false;
+  await deleteAllUserData(id);
+  db.prepare("DELETE FROM users WHERE id = :id AND authType = 'local'").run({ id });
+  await revokeBillsAccess(id);
+  return true;
 }
 
 // ---------- characters ----------
@@ -830,6 +912,7 @@ async function revokeBillsAccess(id) {
 
 module.exports = {
   upsertUser, getUser, updateUserTimezone, updateUserIncome, deleteAllUserData,
+  createLocalAccount, listLocalAccounts, verifyLocalLogin, changeOwnPassword, adminResetPassword, deleteLocalAccount,
   listCharacters, createCharacter, updateCharacter, deleteCharacter,
   listNotes, getNote, createNote, updateNote, deleteNote, clearNotes, restorePreviousVersion,
   listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,

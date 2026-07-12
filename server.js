@@ -316,13 +316,28 @@ app.get("/auth/discord/callback", authLimiter, async (req, res) => {
     req.session.user = {
       id: user.id, username: user.username, avatar: user.avatar, timezone: user.timezone || "UTC",
       incomeEstimate: user.incomeEstimate != null ? user.incomeEstimate : null,
-      incomeCurrency: user.incomeCurrency || "USD"
+      incomeCurrency: user.incomeCurrency || "USD",
+      authType: "discord", mustChangePassword: false
     };
     res.redirect("/");
   } catch (err) {
     console.error(err);
     res.status(500).send("Login failed. Check the server logs.");
   }
+});
+
+app.post("/auth/local-login", authLimiter, (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) return res.status(400).json({ error: "Username and password are required." });
+  const user = store.verifyLocalLogin(username, password);
+  if (!user) return res.status(401).json({ error: "Invalid username or password." });
+  req.session.user = {
+    id: user.id, username: user.username, avatar: null, timezone: user.timezone || "UTC",
+    incomeEstimate: user.incomeEstimate != null ? user.incomeEstimate : null,
+    incomeCurrency: user.incomeCurrency || "USD",
+    authType: "local", mustChangePassword: user.mustChangePassword
+  };
+  res.json({ ok: true });
 });
 
 app.post("/auth/logout", (req, res) => {
@@ -374,6 +389,20 @@ app.get("/api/me/export", requireAuth, (req, res) => {
 app.post("/api/me/delete-data", requireAuth, async (req, res) => {
   await store.deleteAllUserData(req.session.user.id);
   req.session.destroy(() => res.json({ ok: true }));
+});
+
+app.put("/api/me/password", requireAuth, async (req, res) => {
+  if (req.session.user.authType !== "local") {
+    return res.status(400).json({ error: "Discord accounts don't have a Ledger password." });
+  }
+  const { currentPassword, newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters." });
+  }
+  const ok = await store.changeOwnPassword(req.session.user.id, currentPassword || "", newPassword);
+  if (!ok) return res.status(400).json({ error: "Current password is incorrect." });
+  req.session.user.mustChangePassword = false;
+  res.json({ ok: true });
 });
 
 app.use("/api", apiLimiter);
@@ -558,6 +587,50 @@ app.post("/api/admin/allowlist", requireAdmin, async (req, res) => {
 
 app.delete("/api/admin/allowlist/:id", requireAdmin, async (req, res) => {
   const ok = await store.removeAllowlistEntry(req.params.id);
+  if (!ok) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+// ---------- Local (non-Discord) accounts (admin only) ----------
+const LOCAL_USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
+
+app.get("/api/admin/local-accounts", requireAdmin, (req, res) => {
+  const result = store.listLocalAccounts().map((u) => ({
+    id: u.id, username: u.username, createdAt: u.updatedAt,
+    mustChangePassword: u.mustChangePassword, billsAccess: store.hasBillsAccess(u.id)
+  }));
+  res.json(result);
+});
+
+app.post("/api/admin/local-accounts", requireAdmin, async (req, res) => {
+  const { username, password } = req.body || {};
+  const trimmed = String(username || "").trim();
+  if (!LOCAL_USERNAME_RE.test(trimmed)) {
+    return res.status(400).json({ error: "Username must be 3-32 characters (letters, numbers, _ . -)." });
+  }
+  if (!password || password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters." });
+  }
+  try {
+    const account = await store.createLocalAccount(trimmed, password);
+    res.status(201).json({ id: account.id, username: account.username, mustChangePassword: account.mustChangePassword });
+  } catch (err) {
+    res.status(409).json({ error: err.message });
+  }
+});
+
+app.put("/api/admin/local-accounts/:id/password", requireAdmin, async (req, res) => {
+  const { newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters." });
+  }
+  const account = await store.adminResetPassword(req.params.id, newPassword);
+  if (!account) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+app.delete("/api/admin/local-accounts/:id", requireAdmin, async (req, res) => {
+  const ok = await store.deleteLocalAccount(req.params.id);
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 });

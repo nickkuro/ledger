@@ -86,6 +86,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   border-radius: 7px; font-weight: 600; font-size: 14px; text-decoration: none;
 }
 .discord-btn:hover { filter: brightness(1.1); }
+.login-alt-link {
+  display: block; margin: 16px auto 0; background: none; color: var(--ink-dim);
+  font-size: 12.5px; text-decoration: underline; text-underline-offset: 2px;
+}
+.login-alt-link:hover { color: var(--ink-mid); }
+#localLoginPane .discord-btn, #mustChangePasswordScreen .discord-btn { width: 100%; justify-content: center; }
 
 /* ===================== APP SHELL ===================== */
 .app { display: none; height: 100vh; height: 100dvh; height: calc(var(--app-vh) * 100); width: 100vw; }
@@ -428,11 +434,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .modal-title { font-weight: 600; font-size: 15px; margin-bottom: 14px; }
 .modal-field { margin-bottom: 12px; }
 .modal-field label { display: block; font-size: 12px; color: var(--ink-dim); margin-bottom: 5px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.08em; }
-.modal-field input[type=text] {
+.modal-field input[type=text], .modal-field input[type=password] {
   width: 100%; background: var(--surface); border: 1px solid var(--border);
   border-radius: 5px; padding: 7px 9px; font-size: 14px;
 }
-.modal-field input[type=text]:focus { border-color: var(--accent); outline: none; }
+.modal-field input[type=text]:focus, .modal-field input[type=password]:focus { border-color: var(--accent); outline: none; }
 
 /* manage access modal */
 .access-modal { max-width: 460px; }
@@ -448,6 +454,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   flex-shrink: 0; width: 32px; height: 32px; border-radius: 5px;
   font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center;
 }
+#localAccountUsername { flex: 1; min-width: 0; }
+#localAccountPassword { flex: 1; min-width: 0; }
+#localAccountAddBtn {
+  flex-shrink: 0; width: 32px; height: 32px; border-radius: 5px;
+  font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.access-section-divider { border-top: 1px solid var(--border); margin: 16px 0 14px; }
+.access-item-badge {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid rgba(232,163,61,0.4); border-radius: 100px; padding: 1px 6px; flex-shrink: 0;
+}
+.access-reset-btn {
+  flex-shrink: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink-dim);
+  border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; white-space: nowrap;
+}
+.access-reset-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
 .access-list { max-height: 260px; overflow-y: auto; }
 .access-item {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -977,11 +999,49 @@ kbd {
   <div class="login-card">
     <span class="login-mark">¶</span>
     <h1>LEDGER</h1>
-    <p>Log in with Discord to access your character notes.</p>
-    <a class="discord-btn" href="/auth/discord">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.2 14.2 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 0 1 .079.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.001-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.06.06 0 0 0-.031-.028M8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.955 2.418-2.157 2.418m7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418"/></svg>
-      Continue with Discord
-    </a>
+    <div id="discordLoginPane">
+      <p>Log in with Discord to access your character notes.</p>
+      <a class="discord-btn" href="/auth/discord">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.2 14.2 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 0 1 .079.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.001-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.06.06 0 0 0-.031-.028M8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.955 2.418-2.157 2.418m7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418"/></svg>
+        Continue with Discord
+      </a>
+      <button class="login-alt-link" id="showLocalLoginBtn">Log in with a username instead</button>
+    </div>
+    <div class="hidden" id="localLoginPane">
+      <p>Log in with the username and password an admin gave you.</p>
+      <div class="modal-field">
+        <label>Username</label>
+        <input type="text" id="localLoginUsername" autocomplete="username" />
+      </div>
+      <div class="modal-field">
+        <label>Password</label>
+        <input type="password" id="localLoginPassword" autocomplete="current-password" />
+      </div>
+      <button class="discord-btn" id="localLoginSubmit" style="background:var(--accent);">Log in</button>
+      <button class="login-alt-link" id="showDiscordLoginBtn">← Back to Discord login</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORCED PASSWORD CHANGE -->
+<div class="login-screen hidden" id="mustChangePasswordScreen">
+  <div class="login-card">
+    <span class="login-mark">¶</span>
+    <h1>SET A NEW PASSWORD</h1>
+    <p>Before you continue, set a password only you know.</p>
+    <div class="modal-field">
+      <label>Current password</label>
+      <input type="password" id="mcpCurrentPassword" autocomplete="current-password" />
+    </div>
+    <div class="modal-field">
+      <label>New password</label>
+      <input type="password" id="mcpNewPassword" autocomplete="new-password" />
+    </div>
+    <div class="modal-field">
+      <label>Confirm new password</label>
+      <input type="password" id="mcpConfirmPassword" autocomplete="new-password" />
+    </div>
+    <button class="discord-btn" id="mcpSubmit" style="background:var(--accent);">Set password</button>
   </div>
 </div>
 
@@ -1008,6 +1068,7 @@ kbd {
         <div class="settings-menu hidden" id="settingsMenu">
           <button id="clearNotesBtn" class="danger">Clear all notes</button>
           <button id="timezoneBtn">Set timezone</button>
+          <button id="changePasswordBtn" class="hidden">Change password</button>
           <button id="exportDataBtn">Export my data</button>
           <button id="removeMyDataBtn" class="danger">Remove my data</button>
           <button id="manageAccessBtn" class="hidden">Manage access</button>
@@ -1220,17 +1281,67 @@ kbd {
   </div>
 </div>
 
+<!-- CHANGE PASSWORD MODAL (local accounts only) -->
+<div class="overlay-bg hidden" id="changePasswordOverlay">
+  <div class="modal">
+    <div class="modal-title">Change password</div>
+    <div class="modal-field">
+      <label>Current password</label>
+      <input type="password" id="cpCurrentPassword" autocomplete="current-password" />
+    </div>
+    <div class="modal-field">
+      <label>New password</label>
+      <input type="password" id="cpNewPassword" autocomplete="new-password" />
+    </div>
+    <div class="modal-field">
+      <label>Confirm new password</label>
+      <input type="password" id="cpConfirmPassword" autocomplete="new-password" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="cpCancel">Cancel</button>
+      <button class="btn-primary" id="cpSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESET LOCAL ACCOUNT PASSWORD MODAL (admin only) -->
+<div class="overlay-bg hidden" id="resetPasswordOverlay">
+  <div class="modal">
+    <div class="modal-title">Reset password</div>
+    <p style="margin-bottom:12px;">Sets a new password for this account and requires them to change it on next login. Share the new password with them directly.</p>
+    <div class="modal-field">
+      <label>New password</label>
+      <input type="password" id="rpNewPassword" autocomplete="new-password" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="rpCancel">Cancel</button>
+      <button class="btn-primary" id="rpSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- MANAGE ACCESS MODAL (admin only) -->
 <div class="overlay-bg hidden" id="accessOverlay">
   <div class="modal access-modal">
     <div class="modal-title">Manage access</div>
-    <p style="margin-bottom:12px;">Only these Discord accounts can log in. Entries tagged "From env" come from the ALLOWED_DISCORD_IDS environment variable and can only be removed by editing that and redeploying. With no restrictions at all, anyone with Discord can log in. Check "Bills" to give someone their own private Bills tab.</p>
+    <p style="margin-bottom:12px;">Only these Discord accounts can log in with Discord (see Local accounts below for people without one). Entries tagged "From env" come from the ALLOWED_DISCORD_IDS environment variable and can only be removed by editing that and redeploying. With no restrictions at all, anyone with Discord can log in. Check "Bills" to give someone their own private Bills tab.</p>
     <div class="access-add-row">
       <input type="text" id="accessIdInput" placeholder="Discord user ID" />
       <input type="text" id="accessLabelInput" placeholder="Label (optional)" maxlength="64" />
       <button class="btn-primary" id="accessAddBtn" aria-label="Add" title="Add">+</button>
     </div>
     <div class="access-list" id="accessList"></div>
+
+    <div class="access-section-divider"></div>
+    <div class="modal-title" style="font-size:13px;">Local accounts</div>
+    <p style="margin-bottom:12px;">For people without Discord. You set the initial password and share it with them directly — they'll be asked to set their own on first login.</p>
+    <div class="access-add-row">
+      <input type="text" id="localAccountUsername" placeholder="Username" maxlength="32" />
+      <input type="text" id="localAccountPassword" placeholder="Initial password" maxlength="128" />
+      <button class="btn-primary" id="localAccountAddBtn" aria-label="Create" title="Create">+</button>
+    </div>
+    <div class="access-list" id="localAccountsList"></div>
+
     <div class="modal-actions" style="margin-top:14px;">
       <button class="btn-cancel" id="accessCloseBtn">Close</button>
     </div>
@@ -1278,13 +1389,13 @@ kbd {
     <div class="info-panel" id="tab-about">
       <div class="info-section">
         <div class="info-logo">¶ LEDGER</div>
-        <p class="info-sub">Version 2.10 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
+        <p class="info-sub">Version 2.11 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
       </div>
       <div class="info-section">
         <div class="info-heading">How it works</div>
         <div class="info-item">
           <div class="info-item-title">Login</div>
-          <div class="info-item-body">You sign in with Discord. The app asks Discord who you are, then creates a personal space just for your account. No passwords stored.</div>
+          <div class="info-item-body">Most people sign in with Discord — the app asks Discord who you are, then creates a personal space just for your account, with no password stored. If you don't have Discord, an admin can invite you with a local username and password instead (see "Local accounts" below).</div>
         </div>
         <div class="info-item">
           <div class="info-item-title">Characters</div>
@@ -1339,6 +1450,10 @@ kbd {
           <div class="info-item-body">From the settings menu, add or remove the Discord accounts allowed to log in, and grant or revoke individual accounts their own private Bills tab — separate from your own bills.</div>
         </div>
         <div class="info-item">
+          <div class="info-item-title">Local accounts (for people without Discord)</div>
+          <div class="info-item-body">An admin can create a username/password account for anyone from Manage access, no Discord required. Share the initial password directly — they'll be asked to set their own the first time they log in, and can change it anytime from the settings menu. A couple of Discord-only features (Send to DMs, reminders) aren't available on local accounts, since there's no Discord identity to deliver them to.</div>
+        </div>
+        <div class="info-item">
           <div class="info-item-title">Export your data</div>
           <div class="info-item-body">From the settings menu, download all your notes, characters, reminders, and bills as a single JSON file for your own backup.</div>
         </div>
@@ -1385,6 +1500,12 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.11</div>
+          <div class="cl-items">
+            <div class="cl-item new">Added local (non-Discord) accounts — the admin can invite people without Discord from Manage access with a username and password. They set their own password on first login and can change it anytime from Settings.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.10</div>
           <div class="cl-items">
@@ -1692,6 +1813,7 @@ var saveTimers = {};
 var saveStatus = {};
 var charDropdownOpen = false;
 var pendingAction = null; // {type: 'deleteNote'|'clearNotes'|'deleteChar', id?}
+var pendingResetAccountId = null;
 var editingCharId = null;
 
 document.documentElement.setAttribute("data-theme", state.theme);
@@ -1738,6 +1860,9 @@ function api(url, opts) {
 // ---------- Auth ----------
 function showLogin() {
   document.getElementById("loginScreen").classList.remove("hidden");
+  document.getElementById("mustChangePasswordScreen").classList.add("hidden");
+  document.getElementById("localLoginPane").classList.add("hidden");
+  document.getElementById("discordLoginPane").classList.remove("hidden");
   document.getElementById("app").classList.remove("ready");
 }
 function showApp() {
@@ -1757,13 +1882,21 @@ function boot() {
     if(state.isAdmin){
       document.getElementById("manageAccessBtn").classList.remove("hidden");
     }
-    return api("/api/characters");
-  }).then(function(chars){
-    state.characters=chars||[];
-    return loadNotes();
-  }).then(function(){
-    showApp();
-    render();
+    var changePwBtn=document.getElementById("changePasswordBtn");
+    if(changePwBtn) changePwBtn.classList.toggle("hidden", user.authType!=="local");
+    if(user.mustChangePassword){
+      document.getElementById("loginScreen").classList.add("hidden");
+      document.getElementById("mustChangePasswordScreen").classList.remove("hidden");
+      return null;
+    }
+    document.getElementById("mustChangePasswordScreen").classList.add("hidden");
+    return api("/api/characters").then(function(chars){
+      state.characters=chars||[];
+      return loadNotes();
+    }).then(function(){
+      showApp();
+      render();
+    });
   }).catch(function(){});
 }
 
@@ -1774,6 +1907,48 @@ function loadNotes() {
       (arr||[]).forEach(function(n){state.notes[n.id]=n;});
     });
 }
+
+// ---------- Local (non-Discord) login ----------
+document.getElementById("showLocalLoginBtn").addEventListener("click",function(){
+  document.getElementById("discordLoginPane").classList.add("hidden");
+  document.getElementById("localLoginPane").classList.remove("hidden");
+  document.getElementById("localLoginUsername").focus();
+});
+document.getElementById("showDiscordLoginBtn").addEventListener("click",function(){
+  document.getElementById("localLoginPane").classList.add("hidden");
+  document.getElementById("discordLoginPane").classList.remove("hidden");
+});
+
+function submitLocalLogin() {
+  var username=document.getElementById("localLoginUsername").value.trim();
+  var password=document.getElementById("localLoginPassword").value;
+  if(!username||!password){ showToast("Enter a username and password"); return; }
+  api("/auth/local-login",{method:"POST",body:JSON.stringify({username:username,password:password})})
+    .then(function(){ window.location.reload(); })
+    .catch(function(){});
+}
+document.getElementById("localLoginSubmit").addEventListener("click",submitLocalLogin);
+document.getElementById("localLoginPassword").addEventListener("keydown",function(e){
+  if(e.key==="Enter") submitLocalLogin();
+});
+
+function submitPasswordChange() {
+  var current=document.getElementById("mcpCurrentPassword").value;
+  var next=document.getElementById("mcpNewPassword").value;
+  var confirm=document.getElementById("mcpConfirmPassword").value;
+  if(next.length<8){ showToast("New password must be at least 8 characters"); return; }
+  if(next!==confirm){ showToast("New passwords don't match"); return; }
+  api("/api/me/password",{method:"PUT",body:JSON.stringify({currentPassword:current,newPassword:next})})
+    .then(function(){
+      showToast("Password set");
+      boot();
+    })
+    .catch(function(){});
+}
+document.getElementById("mcpSubmit").addEventListener("click",submitPasswordChange);
+document.getElementById("mcpConfirmPassword").addEventListener("keydown",function(e){
+  if(e.key==="Enter") submitPasswordChange();
+});
 
 // ---------- current character obj ----------
 function currentChar() {
@@ -2192,6 +2367,7 @@ function renderEditor() {
     return '<span class="tag-chip-edit" style="color:'+tagColor(t)+'">#'+esc(t)+
       '<button data-remove-tag="'+esc(t)+'" aria-label="Remove">×</button></span>';
   }).join("");
+  var isLocalAccount = state.user && state.user.authType==="local";
 
   editor.innerHTML=
     '<div class="editor-head">'+
@@ -2215,11 +2391,11 @@ function renderEditor() {
         '<div class="editor-actions">'+
           '<button class="editor-action-btn'+(note.prevBody==null&&note.prevTitle==null?' hidden':'')+'" id="restorePrevBtn" title="Restore the version saved right before this one">↺ Restore previous</button>'+
           '<button class="editor-action-btn sticky-toggle'+(note.sticky?' active':'')+'" id="stickyBtn" title="'+(note.sticky?'Unpin note':'Pin note across characters')+'">📌 '+(note.sticky?'Pinned':'Pin')+'</button>'+
-          '<button class="editor-action-btn" id="sendDmBtn" title="Send note to Discord DMs">'+
+          '<button class="editor-action-btn'+(isLocalAccount?' hidden':'')+'" id="sendDmBtn" title="Send note to Discord DMs">'+
             '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20.317 4.369a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.6 12.6 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.2 14.2 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.073.073 0 0 1 .079.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.076.076 0 0 0-.04.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.001-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.06.06 0 0 0-.031-.028M8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.955 2.418-2.157 2.418m7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418"/></svg>'+
             ' Send to DMs'+
           '</button>'+
-          '<button class="editor-action-btn" id="reminderBtn" title="Set a reminder">'+
+          '<button class="editor-action-btn'+(isLocalAccount?' hidden':'')+'" id="reminderBtn" title="Set a reminder">'+
             '🔔 Remind me'+
           '</button>'+
         '</div>'+
@@ -2447,6 +2623,31 @@ document.getElementById("timezoneOverlay").addEventListener("click",function(e){
   if(e.target===this) document.getElementById("timezoneOverlay").classList.add("hidden");
 });
 
+document.getElementById("changePasswordBtn").addEventListener("click",function(){
+  document.getElementById("settingsMenu").classList.add("hidden");
+  document.getElementById("cpCurrentPassword").value="";
+  document.getElementById("cpNewPassword").value="";
+  document.getElementById("cpConfirmPassword").value="";
+  document.getElementById("changePasswordOverlay").classList.remove("hidden");
+});
+document.getElementById("cpCancel").addEventListener("click",function(){
+  document.getElementById("changePasswordOverlay").classList.add("hidden");
+});
+document.getElementById("cpSave").addEventListener("click",function(){
+  var current=document.getElementById("cpCurrentPassword").value;
+  var next=document.getElementById("cpNewPassword").value;
+  var confirm=document.getElementById("cpConfirmPassword").value;
+  if(next.length<8){ showToast("New password must be at least 8 characters"); return; }
+  if(next!==confirm){ showToast("New passwords don't match"); return; }
+  api("/api/me/password",{method:"PUT",body:JSON.stringify({currentPassword:current,newPassword:next})}).then(function(){
+    document.getElementById("changePasswordOverlay").classList.add("hidden");
+    showToast("Password changed");
+  });
+});
+document.getElementById("changePasswordOverlay").addEventListener("click",function(e){
+  if(e.target===this) document.getElementById("changePasswordOverlay").classList.add("hidden");
+});
+
 document.getElementById("exportDataBtn").addEventListener("click",function(){
   document.getElementById("settingsMenu").classList.add("hidden");
   var a=document.createElement("a");
@@ -2538,11 +2739,75 @@ function loadAccessList() {
   api("/api/admin/allowlist").then(renderAccessList);
 }
 
+function localAccountItemRow(e) {
+  var badge = e.mustChangePassword ? '<span class="access-item-badge">Pending</span>' : '';
+  var billsToggle =
+    '<label class="access-bills-toggle" title="Let this account use its own Bills tab">'+
+      '<input type="checkbox" data-local-bills-id="'+esc(e.id)+'"'+(e.billsAccess?' checked':'')+' />'+
+      'Bills'+
+    '</label>';
+  return '<div class="access-item" data-id="'+esc(e.id)+'">'+
+    '<div class="access-item-info">'+
+      '<div class="access-item-label">'+esc(e.username)+badge+'</div>'+
+      '<div class="access-item-id">'+esc(e.id)+'</div>'+
+    '</div>'+
+    '<div class="access-item-actions">'+
+      billsToggle+
+      '<button class="access-reset-btn" data-reset-id="'+esc(e.id)+'">Reset password</button>'+
+      '<button class="access-remove-btn" data-remove-local-id="'+esc(e.id)+'" aria-label="Remove">'+
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'+
+      '</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderLocalAccountsList(entries) {
+  var list = document.getElementById("localAccountsList");
+  list.innerHTML = entries.length
+    ? entries.map(localAccountItemRow).join("")
+    : '<div class="access-empty">No local accounts yet.</div>';
+
+  list.querySelectorAll("[data-remove-local-id]").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var id = btn.getAttribute("data-remove-local-id");
+      openConfirm("Remove this local account? This also permanently deletes all their notes, characters, reminders, and bills. This can't be undone.",{type:"removeLocalAccount",id:id});
+    });
+  });
+  list.querySelectorAll("[data-reset-id]").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      pendingResetAccountId = btn.getAttribute("data-reset-id");
+      document.getElementById("rpNewPassword").value="";
+      document.getElementById("resetPasswordOverlay").classList.remove("hidden");
+    });
+  });
+  list.querySelectorAll("[data-local-bills-id]").forEach(function(cb){
+    cb.addEventListener("change",function(){
+      var id = cb.getAttribute("data-local-bills-id");
+      var grant = cb.checked;
+      var req = grant
+        ? api("/api/admin/bills-access",{method:"POST",body:JSON.stringify({id:id})})
+        : api("/api/admin/bills-access/"+id,{method:"DELETE"});
+      req.then(function(){
+        showToast(grant?"Bills access granted":"Bills access removed");
+      }).catch(function(){
+        cb.checked = !grant;
+      });
+    });
+  });
+}
+
+function loadLocalAccountsList() {
+  api("/api/admin/local-accounts").then(renderLocalAccountsList);
+}
+
 document.getElementById("manageAccessBtn").addEventListener("click",function(){
   document.getElementById("settingsMenu").classList.add("hidden");
   document.getElementById("accessIdInput").value="";
   document.getElementById("accessLabelInput").value="";
+  document.getElementById("localAccountUsername").value="";
+  document.getElementById("localAccountPassword").value="";
   loadAccessList();
+  loadLocalAccountsList();
   document.getElementById("accessOverlay").classList.remove("hidden");
 });
 document.getElementById("accessCloseBtn").addEventListener("click",function(){
@@ -2563,6 +2828,45 @@ document.getElementById("accessAddBtn").addEventListener("click",function(){
     idInput.value=""; labelInput.value="";
     loadAccessList();
     showToast("Added");
+  }).catch(function(){});
+});
+
+document.getElementById("localAccountAddBtn").addEventListener("click",function(){
+  var userInput = document.getElementById("localAccountUsername");
+  var passInput = document.getElementById("localAccountPassword");
+  var username = userInput.value.trim();
+  var password = passInput.value;
+  if(!/^[a-zA-Z0-9_.-]{3,32}$/.test(username)){
+    showToast("Username must be 3-32 characters (letters, numbers, _ . -)");
+    return;
+  }
+  if(password.length<8){
+    showToast("Password must be at least 8 characters");
+    return;
+  }
+  api("/api/admin/local-accounts",{method:"POST",body:JSON.stringify({username:username,password:password})}).then(function(){
+    userInput.value=""; passInput.value="";
+    loadLocalAccountsList();
+    showToast("Account created — share the password with them directly");
+  }).catch(function(){});
+});
+
+document.getElementById("rpCancel").addEventListener("click",function(){
+  document.getElementById("resetPasswordOverlay").classList.add("hidden");
+});
+document.getElementById("resetPasswordOverlay").addEventListener("click",function(e){
+  if(e.target===this) document.getElementById("resetPasswordOverlay").classList.add("hidden");
+});
+document.getElementById("rpSave").addEventListener("click",function(){
+  var newPassword = document.getElementById("rpNewPassword").value;
+  if(newPassword.length<8){
+    showToast("Password must be at least 8 characters");
+    return;
+  }
+  api("/api/admin/local-accounts/"+pendingResetAccountId+"/password",{method:"PUT",body:JSON.stringify({newPassword:newPassword})}).then(function(){
+    document.getElementById("resetPasswordOverlay").classList.add("hidden");
+    loadLocalAccountsList();
+    showToast("Password reset — share the new password with them directly");
   }).catch(function(){});
 });
 
@@ -2725,6 +3029,15 @@ document.getElementById("confirmOk").addEventListener("click",function(){
       if(state.selectedBillId===billId) state.selectedBillId=null;
       renderBillList();
       showToast("Bill deleted");
+    });
+    return;
+  }
+  else if(pendingAction.type==="removeLocalAccount"){
+    var localId=pendingAction.id;
+    closeConfirm();
+    api("/api/admin/local-accounts/"+localId,{method:"DELETE"}).then(function(){
+      loadLocalAccountsList();
+      showToast("Account removed");
     });
     return;
   }
@@ -3674,6 +3987,7 @@ function renderBillEditor() {
   }
   var status = billStatus(bill);
   var statusLabel = status==="paid"?"✅ Paid":status==="overdue"?"⚠️ Overdue":"Upcoming";
+  var isLocalAccount = state.user && state.user.authType==="local";
 
   var priorityBtns = BILL_PRIORITIES.map(function(p){
     return '<button class="bill-priority-btn'+((bill.priority||"medium")===p?" selected":"")+'" data-priority="'+p+'" style="--priority-color:'+PRIORITY_COLORS[p]+'">'+PRIORITY_LABELS[p]+'</button>';
@@ -3703,7 +4017,7 @@ function renderBillEditor() {
         '<input class="bill-name-input" id="billNameInput" placeholder="Bill name" value="'+esc(bill.name)+'" />'+
         '<div class="bill-editor-actions">'+
           payBtn+
-          '<button class="bill-action-btn" id="billSendDmBtn">📨 DM</button>'+
+          '<button class="bill-action-btn'+(isLocalAccount?' hidden':'')+'" id="billSendDmBtn">📨 DM</button>'+
           '<button class="bill-action-btn del" id="billDeleteBtn">🗑</button>'+
         '</div>'+
       '</div>'+
@@ -3730,7 +4044,7 @@ function renderBillEditor() {
               ? '<a class="bill-url-open" href="'+esc(bill.url)+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>'
               : '')+
           '</div></div>'+
-        '<div class="bill-field"><label>Remind me (days before)</label>'+
+        '<div class="bill-field'+(isLocalAccount?' hidden':'')+'"><label>Remind me (days before)</label>'+
           '<input type="number" id="billReminderDays" min="0" max="30" placeholder="e.g. 3" value="'+(bill.reminderDays!=null?bill.reminderDays:"")+'" /></div>'+
         '<div class="bill-field full"><label>Auto-pay</label>'+
           '<div class="bill-toggle-row">'+

@@ -60,6 +60,13 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 - One-time or repeating reminders delivered via DM
 - Per-user timezone support for accurate reminder times
 
+**Local accounts** *(for people without Discord)*
+- Admin creates a username/password account from Manage access — no Discord required
+- New accounts (and admin-reset passwords) must be changed on first login; users can change their own password anytime from Settings
+- Passwords are hashed with Node's built-in `crypto.scrypt` — no new dependency
+- Discord-only features (Send to DMs, reminders) are hidden for local accounts, since there's no Discord identity to deliver them to
+- Removing a local account also deletes everything it owns (notes, characters, reminders, bills)
+
 **Your data**
 - Export — download all your notes, characters, reminders, and bills as a single JSON file, any time, from the settings menu
 - Remove — permanently delete everything on your account (notes, characters, reminders, bills) yourself, with a confirmation step, no need to ask an admin

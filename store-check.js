@@ -167,6 +167,44 @@ async function checkDeleteAllUserData() {
   await store.deleteCharacter(ownerB, otherCharacter.id);
 }
 
+async function checkLocalAccounts() {
+  const username = `store-check-local-${Date.now()}`;
+
+  const account = await store.createLocalAccount(username, 'correcthorsebattery');
+  assert.equal(account.authType, 'local');
+  assert.equal(account.mustChangePassword, true, 'a freshly created account should require a password change');
+  assert.ok(account.id.startsWith('local_'), 'local account ids should be clearly non-numeric, unlike Discord snowflakes');
+
+  // Duplicate username (case-insensitive) must be rejected.
+  await assert.rejects(
+    () => store.createLocalAccount(username.toUpperCase(), 'whatever123'),
+    /already taken/,
+    'duplicate usernames (case-insensitive) should be rejected'
+  );
+
+  assert.equal(store.verifyLocalLogin(username, 'wrongpassword'), null, 'wrong password should not authenticate');
+  assert.ok(store.verifyLocalLogin(username, 'correcthorsebattery'), 'correct password should authenticate');
+  assert.ok(store.verifyLocalLogin(username.toUpperCase(), 'correcthorsebattery'), 'username lookup should be case-insensitive');
+
+  assert.equal(await store.changeOwnPassword(account.id, 'wrongpassword', 'newpassword1'), false, 'changing with the wrong current password should fail');
+  assert.equal(await store.changeOwnPassword(account.id, 'correcthorsebattery', 'newpassword1'), true);
+  assert.equal(store.getUser(account.id).mustChangePassword, false, 'self-service password change should clear the forced-change flag');
+  assert.ok(store.verifyLocalLogin(username, 'newpassword1'), 'login should work with the newly chosen password');
+  assert.equal(store.verifyLocalLogin(username, 'correcthorsebattery'), null, 'the old password should no longer work');
+
+  const reset = await store.adminResetPassword(account.id, 'temp12345');
+  assert.equal(reset.mustChangePassword, true, 'an admin-triggered reset should re-require a password change');
+  assert.ok(store.verifyLocalLogin(username, 'temp12345'), 'login should work with the admin-reset password');
+
+  // Give the account some data, then confirm deleting it wipes both the data and the account itself.
+  const character = await store.createCharacter(account.id, { name: 'Temp', color: '#c9605a' });
+  await store.createNote(account.id, { title: 'Temp note', body: 'x', characterId: character.id });
+  assert.equal(await store.deleteLocalAccount(account.id), true);
+  assert.equal(store.getUser(account.id), null, 'the account row itself should be gone after deletion (unlike the Discord "remove my data" flow)');
+  assert.deepEqual(await store.listNotes(account.id, '__all__'), [], 'notes should be wiped along with the account');
+  assert.equal(await store.deleteLocalAccount(account.id), false, 'deleting an already-deleted account should be a no-op, not throw');
+}
+
 async function runStoreCheck() {
   await checkNotesAndCharacters();
   await checkReminderOwnership();
@@ -175,6 +213,7 @@ async function runStoreCheck() {
   await checkBillPriorityColorAndSorting();
   await checkAllowlistAndBillsAccess();
   await checkDeleteAllUserData();
+  await checkLocalAccounts();
   console.log('Store check passed.');
 }
 
