@@ -1069,6 +1069,8 @@ kbd {
           <button id="clearNotesBtn" class="danger">Clear all notes</button>
           <button id="timezoneBtn">Set timezone</button>
           <button id="changePasswordBtn" class="hidden">Change password</button>
+          <button id="calendarFeedBtn">Calendar feed</button>
+          <button id="discordDigestBtn" class="hidden">Discord digest</button>
           <button id="exportDataBtn">Export my data</button>
           <button id="removeMyDataBtn" class="danger">Remove my data</button>
           <button id="manageAccessBtn" class="hidden">Manage access</button>
@@ -1304,6 +1306,46 @@ kbd {
   </div>
 </div>
 
+<!-- CALENDAR FEED MODAL -->
+<div class="overlay-bg hidden" id="calendarFeedOverlay">
+  <div class="modal">
+    <div class="modal-title">Calendar feed</div>
+    <p style="margin-bottom:12px;">Add this link as a subscribed calendar in Google or Apple Calendar to see your bill and note due dates alongside your real calendar. Treat it like a password — anyone with the link can see your due dates. Recurring bills due on the 29th–31st may be skipped by your calendar app in shorter months (a limitation of the calendar format, not Ledger).</p>
+    <div class="modal-field">
+      <label>Feed URL</label>
+      <input type="text" id="calendarFeedUrl" readonly />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="calendarFeedRegenerate">Regenerate link</button>
+      <button class="btn-primary" id="calendarFeedCopy">Copy link</button>
+    </div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn-cancel" id="calendarFeedClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- DISCORD DIGEST MODAL -->
+<div class="overlay-bg hidden" id="discordDigestOverlay">
+  <div class="modal">
+    <div class="modal-title">Discord digest</div>
+    <p style="margin-bottom:12px;">Get a DM summarizing overdue bills, bills due soon, and upcoming reminders, instead of only per-item pings. Sent only when there's something to report.</p>
+    <div class="modal-field">
+      <label>Frequency</label>
+      <select id="discordDigestFrequency" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:8px 9px;font-size:14px;color:var(--ink);">
+        <option value="off">Off</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="discordDigestCancel">Cancel</button>
+      <button class="btn-primary" id="discordDigestSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- RESET LOCAL ACCOUNT PASSWORD MODAL (admin only) -->
 <div class="overlay-bg hidden" id="resetPasswordOverlay">
   <div class="modal">
@@ -1389,7 +1431,7 @@ kbd {
     <div class="info-panel" id="tab-about">
       <div class="info-section">
         <div class="info-logo">¶ LEDGER</div>
-        <p class="info-sub">Version 2.11 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
+        <p class="info-sub">Version 2.12 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
       </div>
       <div class="info-section">
         <div class="info-heading">How it works</div>
@@ -1451,7 +1493,15 @@ kbd {
         </div>
         <div class="info-item">
           <div class="info-item-title">Local accounts (for people without Discord)</div>
-          <div class="info-item-body">An admin can create a username/password account for anyone from Manage access, no Discord required. Share the initial password directly — they'll be asked to set their own the first time they log in, and can change it anytime from the settings menu. A couple of Discord-only features (Send to DMs, reminders) aren't available on local accounts, since there's no Discord identity to deliver them to.</div>
+          <div class="info-item-body">An admin can create a username/password account for anyone from Manage access, no Discord required. Share the initial password directly — they'll be asked to set their own the first time they log in, and can change it anytime from the settings menu. Manage access shows when each local account last logged in, so you can tell whether an invite has actually been used. A couple of Discord-only features (Send to DMs, reminders) aren't available on local accounts, since there's no Discord identity to deliver them to.</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">Calendar feed</div>
+          <div class="info-item-body">From the settings menu, copy a personal link and add it as a subscribed calendar in Google or Apple Calendar to see your bill and note due dates alongside your real calendar. Treat the link like a password — anyone with it can see your due dates. You can regenerate it anytime, which breaks the old link. Recurring bills due on the 29th–31st may be skipped in shorter months by your calendar app, a limitation of the calendar format itself.</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">Discord digest</div>
+          <div class="info-item-body">Opt in from the settings menu to get a daily, weekly, or monthly DM summarizing overdue bills, bills due soon, and upcoming reminders — sent only when there's something to report. Discord accounts only, since it's delivered via DM.</div>
         </div>
         <div class="info-item">
           <div class="info-item-title">Export your data</div>
@@ -1500,6 +1550,14 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.12</div>
+          <div class="cl-items">
+            <div class="cl-item new">Added a subscribable calendar feed — copy a link from Settings into Google/Apple Calendar to see your bill and note due dates alongside your real calendar.</div>
+            <div class="cl-item new">Added an opt-in Discord digest DM (daily/weekly/monthly) summarizing overdue bills, bills due soon, and upcoming reminders, in one message instead of only per-item pings.</div>
+            <div class="cl-item new">Manage access now shows a "Last login" time for each local account, so you can see whether an invite has actually been used.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.11</div>
           <div class="cl-items">
@@ -1884,6 +1942,8 @@ function boot() {
     }
     var changePwBtn=document.getElementById("changePasswordBtn");
     if(changePwBtn) changePwBtn.classList.toggle("hidden", user.authType!=="local");
+    var digestBtn=document.getElementById("discordDigestBtn");
+    if(digestBtn) digestBtn.classList.toggle("hidden", user.authType!=="discord");
     if(user.mustChangePassword){
       document.getElementById("loginScreen").classList.add("hidden");
       document.getElementById("mustChangePasswordScreen").classList.remove("hidden");
@@ -2648,6 +2708,55 @@ document.getElementById("changePasswordOverlay").addEventListener("click",functi
   if(e.target===this) document.getElementById("changePasswordOverlay").classList.add("hidden");
 });
 
+document.getElementById("calendarFeedBtn").addEventListener("click",function(){
+  document.getElementById("settingsMenu").classList.add("hidden");
+  api("/api/me/ical-token").then(function(res){
+    document.getElementById("calendarFeedUrl").value=res.url;
+    document.getElementById("calendarFeedOverlay").classList.remove("hidden");
+  });
+});
+document.getElementById("calendarFeedClose").addEventListener("click",function(){
+  document.getElementById("calendarFeedOverlay").classList.add("hidden");
+});
+document.getElementById("calendarFeedOverlay").addEventListener("click",function(e){
+  if(e.target===this) document.getElementById("calendarFeedOverlay").classList.add("hidden");
+});
+document.getElementById("calendarFeedCopy").addEventListener("click",function(){
+  var input=document.getElementById("calendarFeedUrl");
+  input.select();
+  input.setSelectionRange(0,99999);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(input.value).then(function(){showToast("Link copied");}).catch(function(){
+      document.execCommand("copy"); showToast("Link copied");
+    });
+  } else {
+    document.execCommand("copy"); showToast("Link copied");
+  }
+});
+document.getElementById("calendarFeedRegenerate").addEventListener("click",function(){
+  openConfirm("Regenerate your calendar feed link? Any calendar app already subscribed to the old link will stop updating.",{type:"regenerateIcalToken"});
+});
+
+document.getElementById("discordDigestBtn").addEventListener("click",function(){
+  document.getElementById("settingsMenu").classList.add("hidden");
+  document.getElementById("discordDigestFrequency").value=(state.user&&state.user.digestFrequency)||"off";
+  document.getElementById("discordDigestOverlay").classList.remove("hidden");
+});
+document.getElementById("discordDigestCancel").addEventListener("click",function(){
+  document.getElementById("discordDigestOverlay").classList.add("hidden");
+});
+document.getElementById("discordDigestOverlay").addEventListener("click",function(e){
+  if(e.target===this) document.getElementById("discordDigestOverlay").classList.add("hidden");
+});
+document.getElementById("discordDigestSave").addEventListener("click",function(){
+  var freq=document.getElementById("discordDigestFrequency").value;
+  api("/api/me/digest",{method:"PUT",body:JSON.stringify({frequency:freq})}).then(function(){
+    if(state.user) state.user.digestFrequency=freq;
+    document.getElementById("discordDigestOverlay").classList.add("hidden");
+    showToast("Digest preference saved");
+  });
+});
+
 document.getElementById("exportDataBtn").addEventListener("click",function(){
   document.getElementById("settingsMenu").classList.add("hidden");
   var a=document.createElement("a");
@@ -2746,10 +2855,12 @@ function localAccountItemRow(e) {
       '<input type="checkbox" data-local-bills-id="'+esc(e.id)+'"'+(e.billsAccess?' checked':'')+' />'+
       'Bills'+
     '</label>';
+  var lastLogin = e.lastLoginAt ? new Date(e.lastLoginAt).toLocaleString() : "Never logged in";
   return '<div class="access-item" data-id="'+esc(e.id)+'">'+
     '<div class="access-item-info">'+
       '<div class="access-item-label">'+esc(e.username)+badge+'</div>'+
       '<div class="access-item-id">'+esc(e.id)+'</div>'+
+      '<div class="access-item-id">Last login: '+esc(lastLogin)+'</div>'+
     '</div>'+
     '<div class="access-item-actions">'+
       billsToggle+
@@ -3038,6 +3149,14 @@ document.getElementById("confirmOk").addEventListener("click",function(){
     api("/api/admin/local-accounts/"+localId,{method:"DELETE"}).then(function(){
       loadLocalAccountsList();
       showToast("Account removed");
+    });
+    return;
+  }
+  else if(pendingAction.type==="regenerateIcalToken"){
+    closeConfirm();
+    api("/api/me/ical-token/regenerate",{method:"POST"}).then(function(res){
+      document.getElementById("calendarFeedUrl").value=res.url;
+      showToast("Calendar link regenerated");
     });
     return;
   }

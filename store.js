@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS users (
   updatedAt INTEGER,
   passwordHash TEXT,
   authType TEXT DEFAULT 'discord',
-  mustChangePassword INTEGER DEFAULT 0
+  mustChangePassword INTEGER DEFAULT 0,
+  icalToken TEXT,
+  digestFrequency TEXT DEFAULT 'off',
+  lastDigestSentAt INTEGER,
+  lastLoginAt INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS characters (
@@ -132,6 +136,10 @@ function ensureSchemaUpToDate(handle) {
   ensureColumn(handle, "users", "passwordHash", "TEXT");
   ensureColumn(handle, "users", "authType", "TEXT DEFAULT 'discord'");
   ensureColumn(handle, "users", "mustChangePassword", "INTEGER DEFAULT 0");
+  ensureColumn(handle, "users", "icalToken", "TEXT");
+  ensureColumn(handle, "users", "digestFrequency", "TEXT DEFAULT 'off'");
+  ensureColumn(handle, "users", "lastDigestSentAt", "INTEGER");
+  ensureColumn(handle, "users", "lastLoginAt", "INTEGER");
 }
 
 // Migrates a legacy data/db.json into the (already schema-created) handle.
@@ -316,7 +324,9 @@ function rowToUser(row) {
   return {
     id: row.id, username: row.username, avatar: row.avatar, timezone: row.timezone,
     incomeEstimate: row.incomeEstimate, incomeCurrency: row.incomeCurrency, updatedAt: row.updatedAt,
-    authType: row.authType || "discord", mustChangePassword: !!row.mustChangePassword
+    authType: row.authType || "discord", mustChangePassword: !!row.mustChangePassword,
+    digestFrequency: row.digestFrequency || "off", lastLoginAt: row.lastLoginAt || null,
+    lastDigestSentAt: row.lastDigestSentAt || null
   };
 }
 
@@ -491,6 +501,54 @@ async function deleteLocalAccount(id) {
   db.prepare("DELETE FROM users WHERE id = :id AND authType = 'local'").run({ id });
   await revokeBillsAccess(id);
   return true;
+}
+
+async function recordLogin(id) {
+  db.prepare("UPDATE users SET lastLoginAt = :lastLoginAt WHERE id = :id").run({ id, lastLoginAt: Date.now() });
+}
+
+// icalToken is deliberately excluded from rowToUser -- it's a bearer
+// credential for the unauthenticated .ics feed route, only ever handed
+// back through these dedicated functions/endpoints.
+async function getOrCreateIcalToken(id) {
+  const row = db.prepare("SELECT icalToken FROM users WHERE id = :id").get({ id });
+  if (!row) return null;
+  if (row.icalToken) return row.icalToken;
+  const token = crypto.randomBytes(24).toString("hex");
+  db.prepare("UPDATE users SET icalToken = :icalToken WHERE id = :id").run({ id, icalToken: token });
+  return token;
+}
+
+async function regenerateIcalToken(id) {
+  const row = db.prepare("SELECT id FROM users WHERE id = :id").get({ id });
+  if (!row) return null;
+  const token = crypto.randomBytes(24).toString("hex");
+  db.prepare("UPDATE users SET icalToken = :icalToken WHERE id = :id").run({ id, icalToken: token });
+  return token;
+}
+
+function getUserByIcalToken(token) {
+  if (!token) return null;
+  return rowToUser(db.prepare("SELECT * FROM users WHERE icalToken = :token").get({ token }));
+}
+
+const DIGEST_FREQUENCIES = ["off", "daily", "weekly", "monthly"];
+
+async function updateDigestFrequency(id, frequency) {
+  if (!DIGEST_FREQUENCIES.includes(frequency)) throw new Error("Invalid digest frequency.");
+  const row = db.prepare("SELECT * FROM users WHERE id = :id").get({ id });
+  if (!row) return null;
+  db.prepare("UPDATE users SET digestFrequency = :digestFrequency WHERE id = :id").run({ id, digestFrequency: frequency });
+  return rowToUser({ ...row, digestFrequency: frequency });
+}
+
+function listUsersWithDigestEnabled() {
+  return db.prepare("SELECT * FROM users WHERE authType = 'discord' AND digestFrequency != 'off'").all()
+    .map(rowToUser);
+}
+
+async function markDigestSent(id) {
+  db.prepare("UPDATE users SET lastDigestSentAt = :lastDigestSentAt WHERE id = :id").run({ id, lastDigestSentAt: Date.now() });
 }
 
 // ---------- characters ----------
@@ -913,6 +971,8 @@ async function revokeBillsAccess(id) {
 module.exports = {
   upsertUser, getUser, updateUserTimezone, updateUserIncome, deleteAllUserData,
   createLocalAccount, listLocalAccounts, verifyLocalLogin, changeOwnPassword, adminResetPassword, deleteLocalAccount,
+  recordLogin, getOrCreateIcalToken, regenerateIcalToken, getUserByIcalToken,
+  updateDigestFrequency, listUsersWithDigestEnabled, markDigestSent,
   listCharacters, createCharacter, updateCharacter, deleteCharacter,
   listNotes, getNote, createNote, updateNote, deleteNote, clearNotes, restorePreviousVersion,
   listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,

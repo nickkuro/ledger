@@ -205,6 +205,47 @@ async function checkLocalAccounts() {
   assert.equal(await store.deleteLocalAccount(account.id), false, 'deleting an already-deleted account should be a no-op, not throw');
 }
 
+async function checkIcalTokenAndDigest() {
+  const ownerId = `store-check-ical-${Date.now()}`;
+  await store.upsertUser({ id: ownerId, username: 'Ical Person', avatar: null });
+
+  const token1 = await store.getOrCreateIcalToken(ownerId);
+  assert.ok(token1 && token1.length > 20, 'a real token should be generated');
+  const token1Again = await store.getOrCreateIcalToken(ownerId);
+  assert.equal(token1Again, token1, 'repeat calls should return the same stable token, not regenerate');
+
+  const token2 = await store.regenerateIcalToken(ownerId);
+  assert.notEqual(token2, token1, 'regenerating should produce a different token');
+
+  const resolved = store.getUserByIcalToken(token2);
+  assert.equal(resolved.id, ownerId, 'the new token should resolve back to the right user');
+  assert.equal(store.getUserByIcalToken(token1), null, 'the old (regenerated-away) token should no longer resolve');
+  assert.equal(store.getUserByIcalToken('not-a-real-token'), null, 'a bogus token should resolve to nothing');
+
+  await assert.rejects(
+    () => store.updateDigestFrequency(ownerId, 'hourly'),
+    /Invalid digest frequency/,
+    'an unrecognized frequency should be rejected'
+  );
+  const updated = await store.updateDigestFrequency(ownerId, 'daily');
+  assert.equal(updated.digestFrequency, 'daily');
+
+  const enabled = store.listUsersWithDigestEnabled();
+  assert.ok(enabled.some((u) => u.id === ownerId), 'an opted-in Discord account should be listed');
+
+  await store.updateDigestFrequency(ownerId, 'off');
+  assert.ok(!store.listUsersWithDigestEnabled().some((u) => u.id === ownerId), 'turning digest off should remove it from the list');
+
+  // A local account should never show up here even if somehow flagged -- listUsersWithDigestEnabled is authType='discord' only.
+  const localAcct = await store.createLocalAccount(`store-check-ical-local-${Date.now()}`, 'correcthorsebattery12');
+  assert.ok(!store.listUsersWithDigestEnabled().some((u) => u.id === localAcct.id), 'local accounts should never receive Discord digests');
+  await store.deleteLocalAccount(localAcct.id);
+
+  assert.equal(store.getUser(ownerId).lastLoginAt, null, 'a user who has never logged in should have no lastLoginAt');
+  await store.recordLogin(ownerId);
+  assert.ok(store.getUser(ownerId).lastLoginAt > 0, 'recordLogin should set lastLoginAt');
+}
+
 async function runStoreCheck() {
   await checkNotesAndCharacters();
   await checkReminderOwnership();
@@ -214,6 +255,7 @@ async function runStoreCheck() {
   await checkAllowlistAndBillsAccess();
   await checkDeleteAllUserData();
   await checkLocalAccounts();
+  await checkIcalTokenAndDigest();
   console.log('Store check passed.');
 }
 

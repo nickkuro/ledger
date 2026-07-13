@@ -222,6 +222,67 @@ function formatNoteForDiscord(note, label = null) {
   return msg.trim();
 }
 
+// ---------- iCal (.ics) feed ----------
+// Recurring bills use RRULE rather than enumerating every occurrence -- the
+// idiomatic iCal approach. Known limitation: RRULE has no "clamp to end of
+// month" concept, so a bill due on the 29th-31st will simply be skipped by
+// Google/Apple Calendar in shorter months, unlike this app's own due-date
+// rollover handling.
+const BILL_RRULE_FREQ = {
+  weekly: "FREQ=WEEKLY",
+  biweekly: "FREQ=WEEKLY;INTERVAL=2",
+  monthly: "FREQ=MONTHLY",
+  quarterly: "FREQ=MONTHLY;INTERVAL=3",
+  yearly: "FREQ=YEARLY"
+};
+
+function icsEscape(text) {
+  return String(text || "").replace(/[\\;,]/g, (c) => "\\" + c).replace(/\n/g, "\\n");
+}
+
+function icsDate(dateStr) {
+  return dateStr.replace(/-/g, "");
+}
+
+function buildICSFeed(bills, notes) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Ledger//Bill and Note Due Dates//EN", "CALSCALE:GREGORIAN"];
+
+  bills.forEach((b) => {
+    if (b.paid || !b.dueDate) return;
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:bill-${b.id}@ledger`);
+    lines.push(`DTSTAMP:${stamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${icsDate(b.dueDate)}`);
+    const rrule = BILL_RRULE_FREQ[b.frequency];
+    if (rrule) lines.push(`RRULE:${rrule}`);
+    lines.push(`SUMMARY:${icsEscape(`${b.name} due (${b.currency} $${Number(b.amount).toFixed(2)})`)}`);
+    lines.push("END:VEVENT");
+  });
+
+  notes.forEach((n) => {
+    if (!n.dueDate) return;
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:note-${n.id}@ledger`);
+    lines.push(`DTSTAMP:${stamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${icsDate(n.dueDate)}`);
+    lines.push(`SUMMARY:${icsEscape(n.title || "Untitled note")}`);
+    lines.push("END:VEVENT");
+  });
+
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n") + "\r\n";
+}
+
+app.get("/calendar/:token.ics", (req, res) => {
+  const user = store.getUserByIcalToken(req.params.token);
+  if (!user) return res.status(404).send("Not found");
+  const bills = store.listBills(user.id);
+  const notes = store.listNotes(user.id, "__all__").filter((n) => n.dueDate);
+  res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+  res.send(buildICSFeed(bills, notes));
+});
+
 // ---------- Reminder job ----------
 function startReminderJob() {
   setInterval(async () => {
@@ -281,6 +342,53 @@ function startBillReminderJob() {
   }, 15 * 60 * 1000);
 }
 
+// ---------- Digest DM job (opt-in daily/weekly/monthly summary) ----------
+const DIGEST_INTERVALS = { daily: 24 * 60 * 60 * 1000, weekly: 7 * 24 * 60 * 60 * 1000, monthly: 30 * 24 * 60 * 60 * 1000 };
+
+function buildDigestMessage(overdue, dueSoon, reminders) {
+  const lines = [];
+  if (overdue.length) {
+    lines.push("**Overdue:**");
+    overdue.forEach((b) => lines.push(`- ${b.name} — ${b.currency} $${Number(b.amount).toFixed(2)} (was due ${b.dueDate})`));
+  }
+  if (dueSoon.length) {
+    lines.push(overdue.length ? "\n**Due soon:**" : "**Due soon:**");
+    dueSoon.forEach((b) => lines.push(`- ${b.name} — ${b.currency} $${Number(b.amount).toFixed(2)} (due ${b.dueDate})`));
+  }
+  if (reminders.length) {
+    lines.push((overdue.length || dueSoon.length) ? "\n**Upcoming reminders:**" : "**Upcoming reminders:**");
+    reminders.forEach((r) => lines.push(`- ${r.noteTitle || "Untitled note"} — ${new Date(r.fireAt).toLocaleString("en-US", { timeZone: "UTC" })} UTC`));
+  }
+  return lines.join("\n");
+}
+
+function startDigestJob() {
+  setInterval(async () => {
+    const now = Date.now();
+    const todayStr = dateToStr(new Date());
+    for (const user of store.listUsersWithDigestEnabled()) {
+      const interval = DIGEST_INTERVALS[user.digestFrequency];
+      if (!interval) continue;
+      const last = user.lastDigestSentAt || 0;
+      if (now - last < interval) continue;
+      try {
+        const bills = store.listBills(user.id);
+        const overdue = bills.filter((b) => !b.paid && b.dueDate && b.dueDate < todayStr);
+        const cutoffStr = dateToStr(new Date(now + interval));
+        const dueSoon = bills.filter((b) => !b.paid && b.dueDate && b.dueDate >= todayStr && b.dueDate <= cutoffStr);
+        const reminders = store.listReminders(user.id).filter((r) => r.fireAt <= now + interval);
+        if (overdue.length || dueSoon.length || reminders.length) {
+          const content = buildDigestMessage(overdue, dueSoon, reminders);
+          await sendDM(user.id, content, { label: "Ledger digest", buttonUrl: getAppUrl() });
+        }
+      } catch (err) {
+        console.error("Digest DM failed:", err.message);
+      }
+      await store.markDigestSent(user.id);
+    }
+  }, 30 * 60 * 1000);
+}
+
 // ---------- Discord OAuth2 ----------
 app.get("/auth/discord", authLimiter, (req, res) => {
   const state = crypto.randomBytes(16).toString("hex");
@@ -313,11 +421,12 @@ app.get("/auth/discord/callback", authLimiter, async (req, res) => {
       return res.status(403).send("Your Discord account isn't on the guest list for this Ledger.");
     }
     const user = await store.upsertUser(profile);
+    await store.recordLogin(user.id);
     req.session.user = {
       id: user.id, username: user.username, avatar: user.avatar, timezone: user.timezone || "UTC",
       incomeEstimate: user.incomeEstimate != null ? user.incomeEstimate : null,
       incomeCurrency: user.incomeCurrency || "USD",
-      authType: "discord", mustChangePassword: false
+      authType: "discord", mustChangePassword: false, digestFrequency: user.digestFrequency
     };
     res.redirect("/");
   } catch (err) {
@@ -326,16 +435,17 @@ app.get("/auth/discord/callback", authLimiter, async (req, res) => {
   }
 });
 
-app.post("/auth/local-login", authLimiter, (req, res) => {
+app.post("/auth/local-login", authLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: "Username and password are required." });
   const user = store.verifyLocalLogin(username, password);
   if (!user) return res.status(401).json({ error: "Invalid username or password." });
+  await store.recordLogin(user.id);
   req.session.user = {
     id: user.id, username: user.username, avatar: null, timezone: user.timezone || "UTC",
     incomeEstimate: user.incomeEstimate != null ? user.incomeEstimate : null,
     incomeCurrency: user.incomeCurrency || "USD",
-    authType: "local", mustChangePassword: user.mustChangePassword
+    authType: "local", mustChangePassword: user.mustChangePassword, digestFrequency: user.digestFrequency
   };
   res.json({ ok: true });
 });
@@ -403,6 +513,27 @@ app.put("/api/me/password", requireAuth, async (req, res) => {
   if (!ok) return res.status(400).json({ error: "Current password is incorrect." });
   req.session.user.mustChangePassword = false;
   res.json({ ok: true });
+});
+
+app.get("/api/me/ical-token", requireAuth, async (req, res) => {
+  const token = await store.getOrCreateIcalToken(req.session.user.id);
+  res.json({ token, url: `${getAppUrl()}/calendar/${token}.ics` });
+});
+
+app.post("/api/me/ical-token/regenerate", requireAuth, async (req, res) => {
+  const token = await store.regenerateIcalToken(req.session.user.id);
+  res.json({ token, url: `${getAppUrl()}/calendar/${token}.ics` });
+});
+
+app.put("/api/me/digest", requireAuth, async (req, res) => {
+  const { frequency } = req.body || {};
+  try {
+    const user = await store.updateDigestFrequency(req.session.user.id, frequency);
+    req.session.user.digestFrequency = user.digestFrequency;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.use("/api", apiLimiter);
@@ -597,7 +728,8 @@ const LOCAL_USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
 app.get("/api/admin/local-accounts", requireAdmin, (req, res) => {
   const result = store.listLocalAccounts().map((u) => ({
     id: u.id, username: u.username, createdAt: u.updatedAt,
-    mustChangePassword: u.mustChangePassword, billsAccess: store.hasBillsAccess(u.id)
+    mustChangePassword: u.mustChangePassword, billsAccess: store.hasBillsAccess(u.id),
+    lastLoginAt: u.lastLoginAt
   }));
   res.json(result);
 });
@@ -663,6 +795,7 @@ app.listen(port, () => {
   if (BOT_TOKEN) {
     startReminderJob();
     startBillReminderJob();
+    startDigestJob();
     console.log("Reminder jobs started.");
   } else {
     console.log("No BOT_TOKEN — DM and reminder features disabled.");

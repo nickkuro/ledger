@@ -58,18 +58,21 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 - Admin-only "Manage access" panel to add or remove allowed Discord accounts, and grant/revoke individual Bills access, all from the UI with no redeploy needed
 - Send any note straight to your own Discord DMs
 - One-time or repeating reminders delivered via DM
+- Opt-in daily/weekly/monthly digest DM summarizing overdue bills, bills due soon, and upcoming reminders in one message — only sent when there's something to report
 - Per-user timezone support for accurate reminder times
 
 **Local accounts** *(for people without Discord)*
 - Admin creates a username/password account from Manage access — no Discord required
 - New accounts (and admin-reset passwords) must be changed on first login; users can change their own password anytime from Settings
 - Passwords are hashed with Node's built-in `crypto.scrypt` — no new dependency
-- Discord-only features (Send to DMs, reminders) are hidden for local accounts, since there's no Discord identity to deliver them to
+- Discord-only features (Send to DMs, reminders, the digest DM) are hidden for local accounts, since there's no Discord identity to deliver them to
+- Manage access shows each local account's last login time, so admins can tell whether an invite has actually been used
 - Removing a local account also deletes everything it owns (notes, characters, reminders, bills)
 
 **Your data**
 - Export — download all your notes, characters, reminders, and bills as a single JSON file, any time, from the settings menu
 - Remove — permanently delete everything on your account (notes, characters, reminders, bills) yourself, with a confirmation step, no need to ask an admin
+- Calendar feed — a personal `.ics` link (works for Discord and local accounts alike) to subscribe to your bill and note due dates from Google/Apple Calendar; regenerate it anytime to invalidate an old link
 - Installable as a mobile app (Add to Home Screen on Android or iOS Safari) via a web app manifest and service worker
 
 **Look & feel**
