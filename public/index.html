@@ -1326,6 +1326,28 @@ kbd {
             <button class="btn-primary" id="timezoneSave">Save timezone</button>
           </div>
         </div>
+        <div class="settings-pane-section">
+          <div class="settings-pane-section-heading">Default currency</div>
+          <p style="margin-bottom:12px;">Used to pre-fill the currency when you add a new bill or set your income estimate.</p>
+          <div class="modal-field">
+            <select id="defaultCurrencySelect" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:8px 9px;font-size:14px;color:var(--ink);">
+              <option value="USD">USD</option>
+              <option value="CAD">CAD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="AUD">AUD</option>
+              <option value="NZD">NZD</option>
+              <option value="CHF">CHF</option>
+              <option value="JPY">JPY</option>
+              <option value="SEK">SEK</option>
+              <option value="NOK">NOK</option>
+              <option value="DKK">DKK</option>
+            </select>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-primary" id="defaultCurrencySave">Save default currency</button>
+          </div>
+        </div>
         <div class="settings-pane-section hidden" id="changePasswordSection">
           <div class="settings-pane-section-heading">Change password</div>
           <div class="modal-field">
@@ -1484,7 +1506,7 @@ kbd {
     <div class="info-panel" id="tab-about">
       <div class="info-section">
         <div class="info-logo">¶ LEDGER</div>
-        <p class="info-sub">Version 2.13.1 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
+        <p class="info-sub">Version 2.14 — a private space for character notes, a calendar, and bill tracking, built with Discord login so your group can each have their own space.</p>
       </div>
       <div class="info-section">
         <div class="info-heading">How it works</div>
@@ -1535,6 +1557,10 @@ kbd {
         <div class="info-item">
           <div class="info-item-title">Timezone</div>
           <div class="info-item-body">Set your timezone in the settings menu (⚙️) so reminder times display correctly in your local time. Each user sets their own timezone independently.</div>
+        </div>
+        <div class="info-item">
+          <div class="info-item-title">Default currency</div>
+          <div class="info-item-body">Set a default currency in Settings → Account so new bills and your income estimate pre-fill with it instead of USD. You can still pick a different currency per bill whenever you need to.</div>
         </div>
         <div class="info-item">
           <div class="info-item-title">Bills</div>
@@ -1603,6 +1629,12 @@ kbd {
 
     <div class="info-panel hidden" id="tab-changelog">
       <div class="changelog">
+        <div class="cl-entry">
+          <div class="cl-version">v2.14</div>
+          <div class="cl-items">
+            <div class="cl-item new">Added a "Default currency" setting (Settings → Account) — pre-fills the currency when you add a new bill or set your income estimate, instead of always defaulting to USD.</div>
+          </div>
+        </div>
         <div class="cl-entry">
           <div class="cl-version">v2.13.1</div>
           <div class="cl-items">
@@ -2728,6 +2760,7 @@ function openSettingsPane(name) {
   });
   if(name==="account"){
     document.getElementById("timezoneSelect").value=(state.user&&state.user.timezone)||"UTC";
+    document.getElementById("defaultCurrencySelect").value=(state.user&&state.user.defaultCurrency)||"USD";
     document.getElementById("cpCurrentPassword").value="";
     document.getElementById("cpNewPassword").value="";
     document.getElementById("cpConfirmPassword").value="";
@@ -2776,6 +2809,14 @@ document.getElementById("timezoneSave").addEventListener("click",function(){
   api("/api/me/timezone",{method:"PUT",body:JSON.stringify({timezone:tz})}).then(function(){
     if(state.user) state.user.timezone=tz;
     showToast("Timezone saved");
+  });
+});
+
+document.getElementById("defaultCurrencySave").addEventListener("click",function(){
+  var currency=document.getElementById("defaultCurrencySelect").value;
+  api("/api/me/default-currency",{method:"PUT",body:JSON.stringify({currency:currency})}).then(function(){
+    if(state.user) state.user.defaultCurrency=currency;
+    showToast("Default currency saved");
   });
 });
 
@@ -4088,7 +4129,7 @@ function renderBillDashboard() {
   var paymentHistory = buildPaymentHistory(state.bills, 6);
 
   var incomeAmount = state.user && state.user.incomeEstimate;
-  var incomeCurrency = (state.user && state.user.incomeCurrency) || "USD";
+  var incomeCurrency = (state.user && (state.user.incomeCurrency || state.user.defaultCurrency)) || "USD";
   var incomeCurrencyOptions = BILL_CURRENCIES.map(function(c){
     return '<option value="'+c+'"'+(incomeCurrency===c?" selected":"")+'>'+c+'</option>';
   }).join("");
@@ -4311,7 +4352,7 @@ function renderBillEditor() {
 }
 
 document.getElementById("addBillBtn").addEventListener("click",function(){
-  api("/api/bills",{method:"POST",body:JSON.stringify({name:"New bill",frequency:"monthly",currency:"USD"})})
+  api("/api/bills",{method:"POST",body:JSON.stringify({name:"New bill",frequency:"monthly",currency:(state.user&&state.user.defaultCurrency)||"USD"})})
     .then(function(bill){
       state.bills.unshift(bill);
       state.selectedBillId=bill.id;

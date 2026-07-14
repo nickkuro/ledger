@@ -246,6 +246,22 @@ async function checkIcalTokenAndDigest() {
   assert.ok(store.getUser(ownerId).lastLoginAt > 0, 'recordLogin should set lastLoginAt');
 }
 
+async function checkDefaultCurrency() {
+  const ownerId = `store-check-currency-${Date.now()}`;
+  const user = await store.upsertUser({ id: ownerId, username: 'Currency Person', avatar: null });
+  assert.equal(user.defaultCurrency, 'USD', 'a brand new user should default to USD');
+
+  await assert.rejects(
+    () => store.updateDefaultCurrency(ownerId, 'DOGE'),
+    /Invalid currency/,
+    'an unrecognized currency code should be rejected'
+  );
+
+  const updated = await store.updateDefaultCurrency(ownerId, 'EUR');
+  assert.equal(updated.defaultCurrency, 'EUR');
+  assert.equal(store.getUser(ownerId).defaultCurrency, 'EUR', 'the change should persist');
+}
+
 async function runStoreCheck() {
   await checkNotesAndCharacters();
   await checkReminderOwnership();
@@ -256,6 +272,7 @@ async function runStoreCheck() {
   await checkDeleteAllUserData();
   await checkLocalAccounts();
   await checkIcalTokenAndDigest();
+  await checkDefaultCurrency();
   console.log('Store check passed.');
 }
 

@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
   icalToken TEXT,
   digestFrequency TEXT DEFAULT 'off',
   lastDigestSentAt INTEGER,
-  lastLoginAt INTEGER
+  lastLoginAt INTEGER,
+  defaultCurrency TEXT DEFAULT 'USD'
 );
 
 CREATE TABLE IF NOT EXISTS characters (
@@ -140,6 +141,7 @@ function ensureSchemaUpToDate(handle) {
   ensureColumn(handle, "users", "digestFrequency", "TEXT DEFAULT 'off'");
   ensureColumn(handle, "users", "lastDigestSentAt", "INTEGER");
   ensureColumn(handle, "users", "lastLoginAt", "INTEGER");
+  ensureColumn(handle, "users", "defaultCurrency", "TEXT DEFAULT 'USD'");
 }
 
 // Migrates a legacy data/db.json into the (already schema-created) handle.
@@ -326,7 +328,7 @@ function rowToUser(row) {
     incomeEstimate: row.incomeEstimate, incomeCurrency: row.incomeCurrency, updatedAt: row.updatedAt,
     authType: row.authType || "discord", mustChangePassword: !!row.mustChangePassword,
     digestFrequency: row.digestFrequency || "off", lastLoginAt: row.lastLoginAt || null,
-    lastDigestSentAt: row.lastDigestSentAt || null
+    lastDigestSentAt: row.lastDigestSentAt || null, defaultCurrency: row.defaultCurrency || "USD"
   };
 }
 
@@ -416,6 +418,16 @@ async function updateUserIncome(id, amount, currency) {
   db.prepare("UPDATE users SET incomeEstimate = :incomeEstimate, incomeCurrency = :incomeCurrency WHERE id = :id")
     .run({ id, incomeEstimate, incomeCurrency });
   return rowToUser({ ...existing, incomeEstimate, incomeCurrency });
+}
+
+const BILL_CURRENCIES = ["CAD", "USD", "EUR", "GBP", "AUD", "NZD", "CHF", "JPY", "SEK", "NOK", "DKK"];
+
+async function updateDefaultCurrency(id, currency) {
+  if (!BILL_CURRENCIES.includes(currency)) throw new Error("Invalid currency.");
+  const existing = db.prepare("SELECT * FROM users WHERE id = :id").get({ id });
+  if (!existing) return null;
+  db.prepare("UPDATE users SET defaultCurrency = :defaultCurrency WHERE id = :id").run({ id, defaultCurrency: currency });
+  return rowToUser({ ...existing, defaultCurrency: currency });
 }
 
 // Self-service "remove my data" -- wipes everything owned by this account
@@ -969,7 +981,7 @@ async function revokeBillsAccess(id) {
 }
 
 module.exports = {
-  upsertUser, getUser, updateUserTimezone, updateUserIncome, deleteAllUserData,
+  upsertUser, getUser, updateUserTimezone, updateUserIncome, updateDefaultCurrency, deleteAllUserData,
   createLocalAccount, listLocalAccounts, verifyLocalLogin, changeOwnPassword, adminResetPassword, deleteLocalAccount,
   recordLogin, getOrCreateIcalToken, regenerateIcalToken, getUserByIcalToken,
   updateDigestFrequency, listUsersWithDigestEnabled, markDigestSent,

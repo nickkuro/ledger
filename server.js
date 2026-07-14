@@ -430,8 +430,9 @@ app.get("/auth/discord/callback", authLimiter, async (req, res) => {
     req.session.user = {
       id: user.id, username: user.username, avatar: user.avatar, timezone: user.timezone || "UTC",
       incomeEstimate: user.incomeEstimate != null ? user.incomeEstimate : null,
-      incomeCurrency: user.incomeCurrency || "USD",
-      authType: "discord", mustChangePassword: false, digestFrequency: user.digestFrequency
+      incomeCurrency: user.incomeCurrency || user.defaultCurrency,
+      authType: "discord", mustChangePassword: false, digestFrequency: user.digestFrequency,
+      defaultCurrency: user.defaultCurrency
     };
     res.redirect("/");
   } catch (err) {
@@ -449,8 +450,9 @@ app.post("/auth/local-login", authLimiter, async (req, res) => {
   req.session.user = {
     id: user.id, username: user.username, avatar: null, timezone: user.timezone || "UTC",
     incomeEstimate: user.incomeEstimate != null ? user.incomeEstimate : null,
-    incomeCurrency: user.incomeCurrency || "USD",
-    authType: "local", mustChangePassword: user.mustChangePassword, digestFrequency: user.digestFrequency
+    incomeCurrency: user.incomeCurrency || user.defaultCurrency,
+    authType: "local", mustChangePassword: user.mustChangePassword, digestFrequency: user.digestFrequency,
+    defaultCurrency: user.defaultCurrency
   };
   res.json({ ok: true });
 });
@@ -535,6 +537,17 @@ app.put("/api/me/digest", requireAuth, async (req, res) => {
   try {
     const user = await store.updateDigestFrequency(req.session.user.id, frequency);
     req.session.user.digestFrequency = user.digestFrequency;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put("/api/me/default-currency", requireAuth, async (req, res) => {
+  const { currency } = req.body || {};
+  try {
+    const user = await store.updateDefaultCurrency(req.session.user.id, currency);
+    req.session.user.defaultCurrency = user.defaultCurrency;
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
