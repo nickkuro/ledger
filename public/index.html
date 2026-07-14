@@ -3656,6 +3656,16 @@ function billStatus(b) {
   return "upcoming";
 }
 
+// Display-only formatting for a "YYYY-MM-DD" due date, following the
+// browser's own locale (MM/DD for US, DD/MM for most EU locales, etc).
+// The underlying dueDate string itself stays ISO everywhere else --
+// sorting, comparisons, and month-slicing all depend on that -- this is
+// only ever used at the point a date gets rendered as text.
+function formatDueDate(dateStr) {
+  if(!dateStr) return "No date";
+  return new Date(dateStr+"T00:00:00").toLocaleDateString(undefined,{year:"numeric",month:"2-digit",day:"2-digit"});
+}
+
 function renderBillList(opts) {
   opts = opts || {};
   var list = document.getElementById("billList");
@@ -3680,7 +3690,7 @@ function renderBillList(opts) {
           '<span class="bill-card-amount">'+b.currency+' $'+Number(b.amount).toFixed(2)+'</span>'+
         '</div>'+
         '<div class="bill-card-meta">'+
-          '<span class="bill-card-due'+dueCls+'">'+(b.dueDate||"No date")+'</span>'+
+          '<span class="bill-card-due'+dueCls+'">'+formatDueDate(b.dueDate)+'</span>'+
           '<div class="bill-card-badges">'+freqBadge+autoBadge+
             '<button class="bill-pay-btn'+payBtnCls+'" data-pay-id="'+b.id+'">'+payBtnLbl+'</button>'+
           '</div>'+
@@ -3959,7 +3969,7 @@ function renderBillDashboard() {
   function itemRow(b){
     return '<div class="bill-dash-item" data-bill-id="'+b.id+'" style="border-left:2px solid '+b.color+'">'+
       '<span class="bill-dash-item-name">'+esc(b.name)+'</span>'+
-      '<span class="bill-dash-item-meta">'+(b.dueDate||"No date")+' · '+b.currency+' $'+Number(b.amount).toFixed(2)+'</span>'+
+      '<span class="bill-dash-item-meta">'+formatDueDate(b.dueDate)+' · '+b.currency+' $'+Number(b.amount).toFixed(2)+'</span>'+
     '</div>';
   }
 
@@ -4127,7 +4137,7 @@ function renderBillEditor() {
     ? '<button class="bill-action-btn unpay" id="billUnpayBtn">↩ Mark unpaid</button>'
     : '<button class="bill-action-btn pay-now" id="billPayBtn">✓ Mark as paid</button>';
   var historyHtml = bill.paidDates&&bill.paidDates.length
-    ? bill.paidDates.map(function(d){return '<div class="bill-history-item"><span class="bill-history-dot"></span>'+d+'</div>';}).join("")
+    ? bill.paidDates.map(function(d){return '<div class="bill-history-item"><span class="bill-history-dot"></span>'+formatDueDate(d)+'</div>';}).join("")
     : '<div class="bill-history-empty">No payments recorded yet.</div>';
 
   editorEl.innerHTML =
@@ -4144,7 +4154,7 @@ function renderBillEditor() {
         '</div>'+
       '</div>'+
       '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--ink-dim);">'+
-        statusLabel+(bill.dueDate?" · Due "+bill.dueDate:"")+(bill.autoPay?" · Auto-pay":"")+
+        statusLabel+(bill.dueDate?" · Due "+formatDueDate(bill.dueDate):"")+(bill.autoPay?" · Auto-pay":"")+
       '</div>'+
     '</div>'+
     '<div class="bill-editor-body">'+
