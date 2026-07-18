@@ -2,7 +2,7 @@
 
 **A private, Discord-backed notes app for characters, stories, and worldbuilding.**
 
-Ledger started as a simple note-taking tool and has grown into a small self-hosted app with character organization, markdown notes, a calendar, reminders, a personal bill scheduler, and Discord integrations — all backed by your own Discord login.
+Ledger started as a simple note-taking tool and has grown into a small self-hosted app with character organization, markdown notes, a calendar, reminders, a personal bill scheduler, and Discord integrations, all backed by your own Discord login.
 
 <p>
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-6DA55F?logo=node.js&logoColor=white">
@@ -12,7 +12,7 @@ Ledger started as a simple note-taking tool and has grown into a small self-host
   <img alt="Status" src="https://img.shields.io/badge/status-actively%20developed-e8a33d">
 </p>
 
-Each user signs in with Discord and gets their own private notes space. Data lives on the server, not the browser — this is intentionally a personal, self-hosted tool rather than a multi-tenant SaaS product.
+Each user signs in with Discord and gets their own private notes space. Data lives on the server, not the browser; this is intentionally a personal, self-hosted tool rather than a multi-tenant SaaS product.
 
 ---
 
@@ -33,10 +33,10 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 - Plain text or Markdown notes with auto-save and live rendering
 - Character-based organization with colored character groups
 - Sticky notes that stay pinned across every character view
-- Spoiler notes — blur a note's card in the list until you open it, for plot twists and anything you don't want to see at a glance
+- Spoiler notes: blur a note's card in the list until you open it, for plot twists and anything you don't want to see at a glance
 - Tags, full-text search, and filtered note views
 - Inline image embedding
-- One-step "previous version" safety net — restore a note's content from right before the last save if an accidental paste-over gets autosaved
+- One-step "previous version" safety net: restore a note's content from right before the last save if an accidental paste-over gets autosaved
 
 **Calendar**
 - Month and week views of due notes, reminders, and bills
@@ -44,38 +44,38 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 - Create a note directly from a calendar day, due date pre-filled
 
 **Bills** *(admin, plus anyone granted access)*
-- Each person with Bills access has their own private bill list — nobody sees anyone else's
-- Track recurring bills — due date, frequency, category, currency, and a Low/Medium/High/Urgent priority (which also sets the bill's colour)
+- Each person with Bills access has their own private bill list; nobody sees anyone else's
+- Track recurring bills: due date, frequency, category, currency, and a Low/Medium/High/Urgent priority (which also sets the bill's colour)
 - Mark paid/unpaid; recurring bills auto-advance to their next due date
 - Bill reminders sent to Discord DMs, same as note reminders
 - Overview dashboard (overdue/upcoming/paid, outstanding bills) shown when no bill is selected, with same-day bills sorted by priority
-- 12-month bill forecast — a real month-by-month projection of what's actually due, plus a yearly total, based on each bill's actual future due dates
+- 12-month bill forecast: a real month-by-month projection of what's actually due, plus a yearly total, based on each bill's actual future due dates
 - "How is this calculated?" breakdown showing exactly which bills (and how many times each) make up the totals
 - Spend-by-category breakdown and a payment history section based on what's actually been paid
 - Estimated monthly income input on the dashboard, with a live left-over/short-by comparison against what's due this month
 - Per-user default currency (Settings → Account) pre-fills new bills and the income estimate instead of always defaulting to USD; changing it can also relabel your existing bills to match
-- Customizable bill categories (Settings → Account) — add or remove categories instead of being stuck with a fixed list
+- Customizable bill categories (Settings → Account): add or remove categories instead of being stuck with a fixed list
 
 **Discord integration**
 - Discord OAuth2 login, with an optional allow-list of approved user IDs
 - Admin-only "Manage access" panel to add or remove allowed Discord accounts, and grant/revoke individual Bills access, all from the UI with no redeploy needed
 - Send any note straight to your own Discord DMs
 - One-time or repeating reminders delivered via DM
-- Opt-in daily/weekly/monthly digest DM summarizing overdue bills, bills due soon, and upcoming reminders in one message — only sent when there's something to report
+- Opt-in daily/weekly/monthly digest DM summarizing overdue bills, bills due soon, and upcoming reminders in one message, only sent when there's something to report
 - Per-user timezone support for accurate reminder times
 
 **Local accounts** *(for people without Discord)*
-- Admin creates a username/password account from Manage access — no Discord required
+- Admin creates a username/password account from Manage access, no Discord required
 - New accounts (and admin-reset passwords) must be changed on first login; users can change their own password anytime from Settings
-- Passwords are hashed with Node's built-in `crypto.scrypt` — no new dependency
+- Passwords are hashed with Node's built-in `crypto.scrypt`, no new dependency
 - Discord-only features (Send to DMs, reminders, the digest DM) are hidden for local accounts, since there's no Discord identity to deliver them to
 - Manage access shows each local account's last login time, so admins can tell whether an invite has actually been used
 - Removing a local account also deletes everything it owns (notes, characters, reminders, bills)
 
 **Your data**
-- Export — download all your notes, characters, reminders, and bills as a single JSON file, any time, from the settings menu
-- Remove — permanently delete everything on your account (notes, characters, reminders, bills) yourself, with a confirmation step, no need to ask an admin
-- Calendar feed — a personal `.ics` link (works for Discord and local accounts alike) to subscribe to your bill and note due dates from Google/Apple Calendar; regenerate it anytime to invalidate an old link
+- Export: download all your notes, characters, reminders, and bills as a single JSON file, any time, from the settings menu
+- Remove: permanently delete everything on your account (notes, characters, reminders, bills) yourself, with a confirmation step, no need to ask an admin
+- Calendar feed: a personal `.ics` link (works for Discord and local accounts alike) to subscribe to your bill and note due dates from Google/Apple Calendar; regenerate it anytime to invalidate an old link
 - Installable as a mobile app (Add to Home Screen on Android or iOS Safari) via a web app manifest and service worker
 
 **Look & feel**
@@ -111,9 +111,9 @@ Fill in the required values:
 | `DISCORD_CLIENT_SECRET` | Yes | From the Discord Developer Portal |
 | `DISCORD_REDIRECT_URI` | Yes | Must exactly match a registered redirect |
 | `SESSION_SECRET` | Yes | Random string used to sign session cookies |
-| `ALLOWED_DISCORD_IDS` | No | Comma-separated baseline guest list of approved Discord user IDs — day-to-day changes are easier via the in-app "Manage access" admin panel |
+| `ALLOWED_DISCORD_IDS` | No | Comma-separated baseline guest list of approved Discord user IDs; day-to-day changes are easier via the in-app "Manage access" admin panel |
 | `BOT_TOKEN` | No | Enables Send-to-DM and reminder features |
-| `ADMIN_DISCORD_ID` | No | Discord ID with site-admin access — Manage Access panel, and their own Bills tab by default |
+| `ADMIN_DISCORD_ID` | No | Discord ID with site-admin access: Manage Access panel, and their own Bills tab by default |
 | `PORT` | No | Custom port (defaults to 3000) |
 
 Generate a session secret with:
@@ -176,10 +176,10 @@ The container uses a persistent data volume so notes, sessions, and bills surviv
 ```
 .
 ├── server.js         Express server, Discord OAuth flow, and API routes
-├── store.js          Data layer — notes, characters, reminders, bills, users
+├── store.js          Data layer: notes, characters, reminders, bills, users
 ├── store-check.js    Lightweight smoke test for the data layer
 ├── public/
-│   ├── index.html      Frontend UI — notes, calendar, bills, and modals
+│   ├── index.html      Frontend UI: notes, calendar, bills, and modals
 │   ├── terms.html       Terms of Service
 │   └── privacy.html     Privacy Policy
 ├── Dockerfile
@@ -190,7 +190,7 @@ The container uses a persistent data volume so notes, sessions, and bills surviv
 
 ## Data storage
 
-Ledger stores data in a SQLite database (`data/ledger.sqlite3`), still just a single file in the same data volume — no separate database service to run or back up.
+Ledger stores data in a SQLite database (`data/ledger.sqlite3`), still just a single file in the same data volume, with no separate database service to run or back up.
 
 Older deployments used a single `data/db.json` file instead. If Ledger finds one on startup, it migrates it into SQLite automatically, verifies the row counts match, and renames the original to `data/db.json.migrated-<timestamp>.bak` (never deletes it). If anything about the migration looks wrong, the server refuses to start rather than run on partial data, and the original `db.json` is left completely untouched.
 
