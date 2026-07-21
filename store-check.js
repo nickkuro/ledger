@@ -369,6 +369,68 @@ async function checkTrashSoftDelete() {
   await store.deleteAllUserData(otherId);
 }
 
+async function checkImport() {
+  const ownerId = `store-check-import-${Date.now()}`;
+  await store.upsertUser({ id: ownerId, username: 'Import Person', avatar: null });
+
+  // A file shaped like an export, with IDs that must not survive verbatim and
+  // an ownerId that must be ignored in favour of the importing account.
+  const file = {
+    characters: [{ id: 'old-char-1', name: 'Alpha', color: '#e8a33d', ownerId: 'someone-else' }],
+    notes: [
+      { id: 'old-note-1', title: 'Imported note', body: 'hello', tags: ['x'], characterId: 'old-char-1', ownerId: 'someone-else' },
+      { id: 'old-note-2', title: 'Loose note', body: 'no character', characterId: null }
+    ],
+    bills: [{ id: 'old-bill-1', name: 'Imported bill', amount: 42, dueDate: '2026-11-01', frequency: 'monthly', paid: true, paidDates: ['2026-10-01'] }]
+  };
+
+  const firstPass = store.analyzeImport(ownerId, file);
+  assert.deepEqual(firstPass.counts, { characters: 1, notes: 2, bills: 1 });
+  assert.equal(firstPass.duplicates.length, 0, 'nothing should look like a duplicate on a fresh account');
+
+  const imported = await store.importData(ownerId, file, []);
+  assert.deepEqual(imported, { characters: 1, notes: 2, bills: 1, skipped: 0 });
+
+  const chars = store.listCharacters(ownerId);
+  const notes = store.listNotes(ownerId, '__all__');
+  const bills = store.listBills(ownerId);
+  assert.equal(chars.length, 1);
+  assert.notEqual(chars[0].id, 'old-char-1', 'imported IDs should be regenerated, never reused');
+  assert.equal(chars[0].ownerId, ownerId, 'imported rows belong to the importing account');
+
+  const linked = notes.find((n) => n.title === 'Imported note');
+  assert.equal(linked.characterId, chars[0].id, "a note's character link should be remapped to the new character id");
+  assert.notEqual(linked.id, 'old-note-1', 'note IDs should be regenerated too');
+  assert.equal(linked.ownerId, ownerId);
+  assert.equal(notes.find((n) => n.title === 'Loose note').characterId, null);
+
+  assert.equal(bills[0].paid, true, 'imported bills keep their paid state');
+  assert.deepEqual(bills[0].paidDates, ['2026-10-01'], 'imported bills keep their payment history');
+
+  // Re-analyzing the same file now flags everything as a duplicate.
+  const secondPass = store.analyzeImport(ownerId, file);
+  assert.equal(secondPass.duplicates.length, 4, 'a re-import should flag all four entries as duplicates');
+  assert.ok(secondPass.duplicates.some((d) => d.type === 'character' && d.label === 'Alpha'));
+  assert.ok(secondPass.duplicates.some((d) => d.type === 'bill' && d.label === 'Imported bill'));
+
+  // Skipping every duplicate imports nothing new, and the skipped character
+  // still resolves so notes would attach to the existing one.
+  const skipAll = await store.importData(ownerId, file, secondPass.duplicates.map((d) => d.key));
+  assert.deepEqual(skipAll, { characters: 0, notes: 0, bills: 0, skipped: 4 });
+  assert.equal(store.listCharacters(ownerId).length, 1, 'skipping duplicates should not create anything');
+  assert.equal(store.listNotes(ownerId, '__all__').length, 2, 'skipping duplicates should leave note count unchanged');
+
+  // Importing anyway (no skips) duplicates them rather than overwriting.
+  await store.importData(ownerId, file, []);
+  assert.equal(store.listNotes(ownerId, '__all__').length, 4, 'importing without skipping should add copies, not overwrite');
+
+  // Malformed input is tolerated rather than throwing.
+  assert.deepEqual(store.analyzeImport(ownerId, {}).counts, { characters: 0, notes: 0, bills: 0 });
+  assert.deepEqual(await store.importData(ownerId, { notes: 'not an array' }, []), { characters: 0, notes: 0, bills: 0, skipped: 0 });
+
+  await store.deleteAllUserData(ownerId);
+}
+
 async function runStoreCheck() {
   await checkNotesAndCharacters();
   await checkReminderOwnership();
@@ -382,6 +444,7 @@ async function runStoreCheck() {
   await checkDefaultCurrency();
   await checkBillCategories();
   await checkTrashSoftDelete();
+  await checkImport();
   console.log('Store check passed.');
 }
 

@@ -1003,6 +1003,104 @@ document.getElementById("discordDigestSave").addEventListener("click",function()
   });
 });
 
+// ---------- Import ----------
+var pendingImport = null; // {data, duplicates}
+
+function resetImportUi() {
+  pendingImport = null;
+  document.getElementById("importReview").classList.add("hidden");
+  document.getElementById("importDupHeader").classList.add("hidden");
+  document.getElementById("importDupList").innerHTML = "";
+  document.getElementById("importFileInput").value = "";
+}
+
+function renderImportReview() {
+  var counts = pendingImport.counts || {};
+  var dups = pendingImport.duplicates || [];
+  var parts = [];
+  if(counts.notes) parts.push(counts.notes+" note"+(counts.notes===1?"":"s"));
+  if(counts.characters) parts.push(counts.characters+" character"+(counts.characters===1?"":"s"));
+  if(counts.bills) parts.push(counts.bills+" bill"+(counts.bills===1?"":"s"));
+
+  var summary = parts.length ? "Found "+parts.join(", ")+" in this file." : "This file doesn't contain anything importable.";
+  if(dups.length) summary += " "+dups.length+" of them look like things you already have, ticked below to be skipped.";
+  document.getElementById("importSummary").textContent = summary;
+
+  var list = document.getElementById("importDupList");
+  document.getElementById("importDupHeader").classList.toggle("hidden", !dups.length);
+  list.innerHTML = dups.map(function(d){
+    return '<div class="trash-item">'+
+      '<div class="trash-item-info">'+
+        '<div class="trash-item-label"><span class="trash-item-kind">'+d.type.toUpperCase()+'</span> '+esc(d.label)+'</div>'+
+      '</div>'+
+      '<label class="trash-item-actions" style="font-size:12px;color:var(--ink-mid);cursor:pointer;">'+
+        '<input type="checkbox" class="import-skip" data-key="'+esc(d.key)+'" checked /> Skip'+
+      '</label>'+
+    '</div>';
+  }).join("");
+
+  document.getElementById("importReview").classList.remove("hidden");
+}
+
+document.getElementById("importPickBtn").addEventListener("click",function(){
+  document.getElementById("importFileInput").click();
+});
+
+document.getElementById("importFileInput").addEventListener("change",function(e){
+  var file = e.target.files && e.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(){
+    var parsed;
+    try { parsed = JSON.parse(reader.result); }
+    catch(err){ showToast("That file isn't valid JSON"); resetImportUi(); return; }
+    api("/api/import/preview",{method:"POST",body:JSON.stringify({data:parsed})}).then(function(res){
+      pendingImport = { data: parsed, counts: res.counts, duplicates: res.duplicates };
+      renderImportReview();
+    }).catch(function(){
+      showToast("That doesn't look like a Ledger export");
+      resetImportUi();
+    });
+  };
+  reader.onerror = function(){ showToast("Couldn't read that file"); resetImportUi(); };
+  reader.readAsText(file);
+});
+
+document.getElementById("importSkipAllBtn").addEventListener("click",function(){
+  document.querySelectorAll(".import-skip").forEach(function(cb){ cb.checked = true; });
+});
+document.getElementById("importKeepAllBtn").addEventListener("click",function(){
+  document.querySelectorAll(".import-skip").forEach(function(cb){ cb.checked = false; });
+});
+document.getElementById("importCancelBtn").addEventListener("click",resetImportUi);
+
+document.getElementById("importConfirmBtn").addEventListener("click",function(){
+  if(!pendingImport) return;
+  var skip = Array.prototype.slice.call(document.querySelectorAll(".import-skip"))
+    .filter(function(cb){ return cb.checked; })
+    .map(function(cb){ return cb.getAttribute("data-key"); });
+  api("/api/import",{method:"POST",body:JSON.stringify({data:pendingImport.data, skip:skip})}).then(function(res){
+    var added = [];
+    if(res.notes) added.push(res.notes+" note"+(res.notes===1?"":"s"));
+    if(res.characters) added.push(res.characters+" character"+(res.characters===1?"":"s"));
+    if(res.bills) added.push(res.bills+" bill"+(res.bills===1?"":"s"));
+    showToast(added.length ? "Imported "+added.join(", ") : "Nothing imported");
+    resetImportUi();
+    // Pull the newly imported data into the current view.
+    api("/api/characters").then(function(chars){
+      state.characters = chars || [];
+      return loadNotes();
+    }).then(function(){
+      render();
+      if(state.canAccessBills){
+        api("/api/bills").then(function(bills){ state.bills = bills||[]; if(state.view==="bills") renderBillList(); });
+      }
+    });
+  }).catch(function(){
+    showToast("Import failed");
+  });
+});
+
 // ---------- Trash ("Recently deleted") ----------
 function trashDeletedLabel(deletedAt, retentionDays) {
   var daysLeft = retentionDays - Math.floor((Date.now()-deletedAt)/86400000);

@@ -29,7 +29,9 @@ function isAllowedDiscordId(id) {
 
 const app = express();
 app.set("trust proxy", 1);
-app.use(express.json());
+// The default 100kb is comfortably under the size of a real export file, which
+// import posts back in full, so the ceiling is raised for that path's sake.
+app.use(express.json({ limit: "10mb" }));
 app.use(session({
   store: new FileStore({
     path: path.join(__dirname, "data", "sessions"),
@@ -843,6 +845,24 @@ app.delete("/api/admin/bills-access/:id", requireAdmin, async (req, res) => {
   const ok = await store.revokeBillsAccess(req.params.id);
   if (!ok) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
+});
+
+// ---------- Import ----------
+app.post("/api/import/preview", requireAuth, (req, res) => {
+  const { data } = req.body || {};
+  if (!data || typeof data !== "object") return res.status(400).json({ error: "That doesn't look like a Ledger export file." });
+  res.json(store.analyzeImport(req.session.user.id, data));
+});
+
+app.post("/api/import", requireAuth, async (req, res) => {
+  const { data, skip } = req.body || {};
+  if (!data || typeof data !== "object") return res.status(400).json({ error: "That doesn't look like a Ledger export file." });
+  try {
+    res.json(await store.importData(req.session.user.id, data, skip));
+  } catch (err) {
+    console.error("Import failed:", err.message);
+    res.status(400).json({ error: "Import failed. The file may be malformed." });
+  }
 });
 
 // ---------- Trash ----------

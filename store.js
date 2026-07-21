@@ -1017,6 +1017,113 @@ async function emptyTrash(ownerId) {
   return { notes: Number(notes.changes), bills: Number(bills.changes) };
 }
 
+// ---------- import ----------
+// Imports are strictly additive: nothing already in the account is modified or
+// removed. Everything lands owned by the importing user regardless of what the
+// file claims, and IDs are always regenerated so a file can never collide with
+// (or overwrite) existing rows. Reminders are deliberately not imported --
+// replaying stale ones would fire a burst of DMs for things already past.
+function importNorm(value) {
+  return String(value == null ? "" : value).trim().toLowerCase();
+}
+
+function importKey(type, index) {
+  return type + ":" + index;
+}
+
+function importSections(data) {
+  const safe = data && typeof data === "object" ? data : {};
+  return {
+    characters: Array.isArray(safe.characters) ? safe.characters : [],
+    notes: Array.isArray(safe.notes) ? safe.notes : [],
+    bills: Array.isArray(safe.bills) ? safe.bills : []
+  };
+}
+
+function noteFingerprint(n) { return importNorm(n.title) + " " + importNorm(n.body); }
+function billFingerprint(b) { return importNorm(b.name) + " " + (parseFloat(b.amount) || 0) + " " + (b.dueDate || ""); }
+
+// Reports what a file would add and which entries look like things the account
+// already has, so the user can decide what to do about each one.
+function analyzeImport(ownerId, data) {
+  const { characters, notes, bills } = importSections(data);
+  const existingChars = new Set(listCharacters(ownerId).map((c) => importNorm(c.name)));
+  const existingNotes = new Set(listNotes(ownerId, "__all__").map(noteFingerprint));
+  const existingBills = new Set(listBills(ownerId).map(billFingerprint));
+
+  const duplicates = [];
+  characters.forEach((c, i) => {
+    if (existingChars.has(importNorm(c.name))) {
+      duplicates.push({ key: importKey("character", i), type: "character", label: c.name || "Unnamed character" });
+    }
+  });
+  notes.forEach((n, i) => {
+    if (existingNotes.has(noteFingerprint(n))) {
+      duplicates.push({ key: importKey("note", i), type: "note", label: n.title || "Untitled" });
+    }
+  });
+  bills.forEach((b, i) => {
+    if (existingBills.has(billFingerprint(b))) {
+      duplicates.push({ key: importKey("bill", i), type: "bill", label: b.name || "Untitled bill" });
+    }
+  });
+
+  return {
+    counts: { characters: characters.length, notes: notes.length, bills: bills.length },
+    duplicates
+  };
+}
+
+async function importData(ownerId, data, skipKeys) {
+  const { characters, notes, bills } = importSections(data);
+  const skip = new Set(Array.isArray(skipKeys) ? skipKeys : []);
+  const existingChars = new Map(listCharacters(ownerId).map((c) => [importNorm(c.name), c]));
+  const charIdMap = new Map();
+  const result = { characters: 0, notes: 0, bills: 0, skipped: 0 };
+
+  for (let i = 0; i < characters.length; i++) {
+    const c = characters[i];
+    const existing = existingChars.get(importNorm(c.name));
+    if (skip.has(importKey("character", i))) {
+      result.skipped++;
+      // A skipped duplicate still needs to resolve, so this file's notes attach
+      // to the character already in the account rather than going loose.
+      if (c.id && existing) charIdMap.set(c.id, existing.id);
+      continue;
+    }
+    const created = await createCharacter(ownerId, { name: c.name, color: c.color });
+    if (c.id) charIdMap.set(c.id, created.id);
+    result.characters++;
+  }
+
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    if (skip.has(importKey("note", i))) { result.skipped++; continue; }
+    await createNote(ownerId, {
+      characterId: n.characterId ? (charIdMap.get(n.characterId) || null) : null,
+      title: n.title, body: n.body, tags: n.tags,
+      sticky: n.sticky, spoiler: n.spoiler, dueDate: n.dueDate
+    });
+    result.notes++;
+  }
+
+  for (let i = 0; i < bills.length; i++) {
+    const b = bills[i];
+    if (skip.has(importKey("bill", i))) { result.skipped++; continue; }
+    const created = await createBill(ownerId, b);
+    // createBill deliberately starts every bill unpaid with no history, so the
+    // imported payment record is restored separately.
+    const paidDates = Array.isArray(b.paidDates) ? b.paidDates : [];
+    if (b.paid || paidDates.length) {
+      db.prepare("UPDATE bills SET paid = :paid, paidDates = :paidDates WHERE id = :id")
+        .run({ id: created.id, paid: b.paid ? 1 : 0, paidDates: JSON.stringify(paidDates) });
+    }
+    result.bills++;
+  }
+
+  return result;
+}
+
 // Unscoped by owner -- driven by the server's scheduled purge job.
 async function purgeExpiredTrash(retentionDays = TRASH_RETENTION_DAYS) {
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
@@ -1097,6 +1204,7 @@ module.exports = {
   listReminders, listRemindersForNote, getDueReminders, createReminder, rescheduleReminder, deleteReminder,
   listBills, getBill, createBill, updateBill, markBillPaid, markBillUnpaid, deleteBill,
   listTrash, restoreFromTrash, deleteFromTrashPermanently, emptyTrash, purgeExpiredTrash,
+  analyzeImport, importData,
   getAllBills, markBillReminderSent,
   listAllowlist, addAllowlistEntry, removeAllowlistEntry,
   listBillsAccess, hasBillsAccess, grantBillsAccess, revokeBillsAccess

@@ -112,6 +112,49 @@ test("a logged-in user can create and read their own note", async () => {
   assert.ok(list.json.some((n) => n.id === created.json.id), "own note should appear in the list");
 });
 
+test("import previews duplicates, respects skips, and ignores ownerId in the file", async () => {
+  const aliceCookie = await loginAs("alice_import", "correcthorsebattery");
+  const bobCookie = await loginAs("bob_importvictim", "correcthorsebattery");
+
+  // The file claims to belong to Bob; it must land in Alice's account anyway.
+  const file = {
+    characters: [],
+    notes: [{ id: "spoofed", title: "Imported", body: "content", ownerId: "bob_importvictim" }],
+    bills: []
+  };
+
+  const preview = await req("POST", "/api/import/preview", { cookie: aliceCookie, body: { data: file } });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.json.counts.notes, 1);
+  assert.equal(preview.json.duplicates.length, 0);
+
+  const done = await req("POST", "/api/import", { cookie: aliceCookie, body: { data: file, skip: [] } });
+  assert.equal(done.status, 200);
+  assert.equal(done.json.notes, 1);
+
+  const aliceNotes = await req("GET", "/api/notes", { cookie: aliceCookie });
+  const landed = aliceNotes.json.find((n) => n.title === "Imported");
+  assert.ok(landed, "the note should land in the importing account");
+  assert.notEqual(landed.id, "spoofed", "the id in the file must not be reused");
+
+  const bobNotes = await req("GET", "/api/notes", { cookie: bobCookie });
+  assert.ok(!bobNotes.json.some((n) => n.title === "Imported"), "the ownerId in the file must not place data in another account");
+
+  // Re-previewing now flags it, and skipping it imports nothing.
+  const second = await req("POST", "/api/import/preview", { cookie: aliceCookie, body: { data: file } });
+  assert.equal(second.json.duplicates.length, 1, "a re-import should flag the note as a duplicate");
+  const skipped = await req("POST", "/api/import", { cookie: aliceCookie, body: { data: file, skip: second.json.duplicates.map((d) => d.key) } });
+  assert.deepEqual(skipped.json, { characters: 0, notes: 0, bills: 0, skipped: 1 });
+});
+
+test("import rejects unauthenticated callers and junk payloads", async () => {
+  assert.equal((await req("POST", "/api/import", { body: { data: {} } })).status, 401);
+  assert.equal((await req("POST", "/api/import/preview", { body: { data: {} } })).status, 401);
+  const cookie = await loginAs("alice_importjunk", "correcthorsebattery");
+  assert.equal((await req("POST", "/api/import", { cookie, body: { data: "nonsense" } })).status, 400);
+  assert.equal((await req("POST", "/api/import/preview", { cookie, body: {} })).status, 400);
+});
+
 test("deleting a note moves it to the trash and it can be restored", async () => {
   const cookie = await loginAs("alice_trash", "correcthorsebattery");
   const created = await req("POST", "/api/notes", { cookie, body: { title: "Trash me", body: "content" } });

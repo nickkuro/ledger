@@ -1455,6 +1455,29 @@ kbd {
           </div>
         </div>
         <div class="settings-pane-section">
+          <div class="settings-pane-section-heading">Import</div>
+          <p style="margin-bottom:12px;">Load a Ledger export file. Imported items are added alongside what you already have, so nothing is overwritten or deleted. Anything that looks like something you already have gets flagged so you can decide. Reminders aren't imported.</p>
+          <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;" />
+          <div class="modal-actions">
+            <button class="btn-primary" id="importPickBtn">Choose a file…</button>
+          </div>
+          <div id="importReview" class="hidden">
+            <div id="importSummary" style="font-size:13px;margin-bottom:10px;"></div>
+            <div id="importDupHeader" class="hidden" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+              <span style="font-size:12px;color:var(--ink-mid);">Untick anything you want imported anyway</span>
+              <span style="display:flex;gap:6px;">
+                <button class="trash-btn" id="importSkipAllBtn">Skip all</button>
+                <button class="trash-btn" id="importKeepAllBtn">Import all</button>
+              </span>
+            </div>
+            <div class="trash-list" id="importDupList"></div>
+            <div class="modal-actions">
+              <button class="btn-cancel" id="importCancelBtn">Cancel</button>
+              <button class="btn-primary" id="importConfirmBtn">Import</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-pane-section">
           <div class="settings-pane-section-heading">Recently deleted</div>
           <p style="margin-bottom:12px;">Deleted notes and bills are kept here for 30 days so you can get them back, then removed automatically.</p>
           <div class="trash-list" id="trashList"></div>
@@ -1637,6 +1660,10 @@ kbd {
           <div class="info-item-body">Opt in from the settings menu to get a daily, weekly, or monthly DM summarizing overdue bills, bills due soon, and upcoming reminders, sent only when there's something to report. Discord accounts only, since it's delivered via DM.</div>
         </div>
         <div class="info-item">
+          <div class="info-item-title">Import your data</div>
+          <div class="info-item-body">From Settings → Your data, load a Ledger export file back in. Everything is added alongside what you already have, so an import never overwrites or deletes anything. Before it runs, Ledger lists anything that looks like something you already have (same note title and content, same character name, or same bill name, amount and due date) and ticks it to be skipped, so you decide what actually comes in. Reminders aren't imported, since replaying old ones would fire a burst of DMs.</div>
+        </div>
+        <div class="info-item">
           <div class="info-item-title">Recently deleted</div>
           <div class="info-item-body">Deleting a note or bill moves it to "Recently deleted" in Settings → Your data rather than removing it immediately. You can restore anything from there for 30 days, after which it's cleared automatically. You can also delete an item for good yourself, or empty the whole trash, if you'd rather not wait.</div>
         </div>
@@ -1696,6 +1723,7 @@ kbd {
             <div class="cl-item new">Spoiler notes: mark a note as a spoiler (🙈 in the editor) to blur its card in the list until you open it. Good for plot twists you don't want to spot at a glance.</div>
             <div class="cl-item fix">Actually fixed the notes list scrollbar breaking after switching to Calendar or Bills and back. The last go at this treated a symptom; turns out the notes pane was quietly falling back to the wrong layout mode. Fixed properly at the source this time.</div>
             <div class="cl-item new">Deleted notes and bills now go to a "Recently deleted" list in Settings → Your data instead of vanishing. Restore them for up to 30 days, or delete them for good yourself.</div>
+            <div class="cl-item new">You can now import a Ledger export file (Settings → Your data). Imported items are added alongside what you already have, and anything that looks like a duplicate is listed first so you decide what to skip.</div>
             <div class="cl-item fix">Under-the-hood hardening: the markdown libraries are now served from Ledger itself instead of a third-party CDN, and the app sends a Content-Security-Policy. Nothing changes for you, it's just a bit tighter and more self-contained.</div>
           </div>
         </div>
