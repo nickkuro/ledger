@@ -90,6 +90,7 @@ Each user signs in with Discord and gets their own private notes space. Data liv
 
 **Look & feel**
 - Dark/light theme
+- First-visit onboarding tour over the login screen (shown once, dismissible, remembered per browser)
 - In-app About + versioned Changelog
 - Terms of Service and Privacy Policy pages
 

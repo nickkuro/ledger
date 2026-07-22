@@ -106,6 +106,132 @@ function showApp() {
   document.getElementById("app").classList.add("ready");
 }
 
+// ---------- First-visit onboarding tour ----------
+// Shown once over the login screen for brand-new visitors, gated by a
+// localStorage flag. Copy is verbatim from the design handoff.
+var ONBOARD_SLIDES = [
+  {type:"welcome", eyebrow:"WELCOME", title:"Welcome to Ledger", desc:"A private space for character notes, a calendar, and bill tracking. Here's a quick look at what you can do."},
+  {type:"notes", eyebrow:"NOTES", title:"Organize by character", desc:"Write plain text or Markdown notes and group them by character. Pin sticky notes, tag and search freely, and blur spoiler notes until you're ready to see them."},
+  {type:"calendar", eyebrow:"CALENDAR", title:"See what's coming up", desc:"Month and week views show every due note, reminder, and bill. Click a day to create a note with its due date already filled in."},
+  {type:"bills", eyebrow:"BILLS", title:"Never miss a due date", desc:"Track recurring bills with priority-based color coding, get a 12-month forecast of what's actually due, and a breakdown of exactly how each total is calculated."},
+  {type:"budget", eyebrow:"BUDGET", title:"Envelope budgeting, made simple", desc:"Set monthly targets seeded straight from your bills. Paid bills count automatically, and any overspend or underspend rolls into next month."},
+  {type:"discord", eyebrow:"DISCORD", title:"Reminders where you already are", desc:"Send notes to your own Discord DMs, schedule one-time or repeating reminders, and get an optional digest summarizing what's due."},
+  {type:"local", eyebrow:"NO DISCORD? NO PROBLEM", title:"Local accounts, too", desc:"An admin can invite anyone with just a username and password. Set your own password on first login and you're in."}
+];
+var onboardSlide = 0;
+
+function onboardSeen() {
+  try { return !!localStorage.getItem("ledger_onboarding_seen"); } catch(e){ return false; }
+}
+function markOnboardSeen() {
+  try { localStorage.setItem("ledger_onboarding_seen", "1"); } catch(e){}
+}
+
+function onboardVisual(type) {
+  if(type==="welcome"){
+    return '<span style="font-size:56px;color:var(--accent);font-family:\'IBM Plex Mono\',monospace;">¶</span>';
+  }
+  if(type==="notes"){
+    return '<div class="onboard-mock" style="width:340px;">'+
+      '<div class="onboard-mock-char"><span class="onboard-mock-dot"></span><span class="onboard-mock-charname">Elena Voss</span></div>'+
+      '<div class="onboard-mock-note"><div class="onboard-mock-note-title">The Fractured Crown — ch. 4</div><div class="onboard-mock-note-snippet">She hadn\'t meant to open the letter…</div></div>'+
+      '<div class="onboard-mock-note"><div class="onboard-mock-note-title">Character backstory</div><div class="onboard-mock-note-snippet">Born in the northern reaches…</div></div>'+
+    '</div>';
+  }
+  if(type==="calendar"){
+    var cells = "";
+    for(var i=0;i<35;i++){
+      var day = i-2;
+      var valid = day>=1 && day<=31;
+      var marked = valid && [3,11,18,24].indexOf(day)>-1;
+      var bg = marked ? "var(--accent)" : (valid ? "var(--surface)" : "transparent");
+      var color = marked ? "var(--accent-ink)" : "var(--ink-mid)";
+      cells += '<div class="onboard-cal-cell" style="background:'+bg+';color:'+color+';">'+(valid?day:"")+'</div>';
+    }
+    return '<div class="onboard-mock" style="width:300px;">'+
+      '<div class="onboard-mock-monthlabel">JULY</div>'+
+      '<div class="onboard-cal-grid">'+cells+'</div>'+
+    '</div>';
+  }
+  if(type==="bills"){
+    var heights = [40,55,30,70,45,60,35,80,50,65,42,58];
+    var bars = heights.map(function(h,i){
+      return '<div class="onboard-bar" style="height:'+h+'%;background:'+(i===7?"var(--accent)":"var(--border)")+';"></div>';
+    }).join("");
+    return '<div class="onboard-mock" style="width:320px;padding:16px;">'+
+      '<div class="onboard-mock-forecast-label">12-MONTH FORECAST</div>'+
+      '<div class="onboard-bars">'+bars+'</div>'+
+    '</div>';
+  }
+  if(type==="budget"){
+    return '<svg width="72" height="72" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="14" rx="2" stroke="var(--accent)" stroke-width="1.4"></rect><path d="M2 10h20" stroke="var(--accent)" stroke-width="1.4"></path><circle cx="12" cy="15" r="2.2" stroke="var(--accent)" stroke-width="1.4"></circle></svg>';
+  }
+  if(type==="discord"){
+    return '<svg width="72" height="72" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="12" rx="4" stroke="var(--accent)" stroke-width="1.4"></rect><path d="M8 21l3-4h2l3 4" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round"></path><circle cx="9" cy="11" r="1.1" fill="var(--accent)"></circle><circle cx="15" cy="11" r="1.1" fill="var(--accent)"></circle></svg>';
+  }
+  if(type==="local"){
+    return '<svg width="72" height="72" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="4.3" stroke="var(--accent)" stroke-width="1.4"></circle><path d="M11 11l9 9M16 16l3-3M18.5 18.5l2-2" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round"></path></svg>';
+  }
+  return "";
+}
+
+function renderOnboarding() {
+  var card = document.getElementById("onboardCard");
+  var cur = ONBOARD_SLIDES[onboardSlide];
+  var isLast = onboardSlide === ONBOARD_SLIDES.length-1;
+  var isFirst = onboardSlide === 0;
+
+  var dots = ONBOARD_SLIDES.map(function(s,i){
+    return '<button class="onboard-dot'+(i===onboardSlide?" active":"")+'" data-onboard-goto="'+i+'" aria-label="Go to slide '+(i+1)+'"></button>';
+  }).join("");
+
+  card.innerHTML =
+    '<button class="onboard-skip" id="onboardSkip">Skip</button>'+
+    '<div class="onboard-inner">'+
+      '<div class="onboard-visual">'+onboardVisual(cur.type)+'</div>'+
+      '<div class="onboard-copy">'+
+        '<div class="onboard-eyebrow">'+esc(cur.eyebrow)+'</div>'+
+        '<h2 class="onboard-title">'+esc(cur.title)+'</h2>'+
+        '<p class="onboard-desc">'+esc(cur.desc)+'</p>'+
+      '</div>'+
+      '<div class="onboard-dots">'+dots+'</div>'+
+      '<div class="onboard-footer">'+
+        '<button class="onboard-back" id="onboardBack"'+(isFirst?" disabled":"")+'>← Back</button>'+
+        '<div class="onboard-step">STEP '+(onboardSlide+1)+' OF '+ONBOARD_SLIDES.length+'</div>'+
+        '<button class="onboard-next" id="onboardNext">'+(isLast?"Get started":"Next")+'</button>'+
+      '</div>'+
+    '</div>';
+
+  document.getElementById("onboardSkip").addEventListener("click", dismissOnboarding);
+  document.getElementById("onboardBack").addEventListener("click", function(){
+    if(onboardSlide>0){ onboardSlide--; renderOnboarding(); }
+  });
+  document.getElementById("onboardNext").addEventListener("click", function(){
+    if(onboardSlide >= ONBOARD_SLIDES.length-1){ dismissOnboarding(); return; }
+    onboardSlide++; renderOnboarding();
+  });
+  card.querySelectorAll("[data-onboard-goto]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      onboardSlide = Number(btn.getAttribute("data-onboard-goto"));
+      renderOnboarding();
+    });
+  });
+}
+
+function dismissOnboarding() {
+  markOnboardSeen();
+  document.getElementById("onboardOverlay").classList.add("hidden");
+  document.getElementById("loginScreen").classList.remove("onboard-open");
+}
+
+function maybeShowOnboarding() {
+  if(onboardSeen()) return;
+  onboardSlide = 0;
+  document.getElementById("loginScreen").classList.add("onboard-open");
+  document.getElementById("onboardOverlay").classList.remove("hidden");
+  renderOnboarding();
+}
+
 // ---------- Boot ----------
 function boot() {
   api("/api/me").then(function(user){
@@ -139,7 +265,10 @@ function boot() {
       showApp();
       render();
     });
-  }).catch(function(){});
+  }).catch(function(){
+    // Not logged in: the login screen stays up. First-time visitors get the tour.
+    maybeShowOnboarding();
+  });
 }
 
 function loadNotes() {

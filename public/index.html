@@ -80,6 +80,60 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .login-mark { font-size: 32px; color: var(--accent); font-family: 'IBM Plex Mono', monospace; display: block; margin-bottom: 8px; }
 .login-card h1 { font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.14em; font-size: 18px; margin-bottom: 10px; }
 .login-card p { color: var(--ink-mid); font-size: 13px; line-height: 1.6; margin-bottom: 26px; }
+
+/* ---- First-visit onboarding tour ---- */
+.login-screen.onboard-open .login-card { filter: blur(2px) brightness(0.6); transition: filter 0.4s ease; }
+.onboard-overlay {
+  position: fixed; inset: 0; z-index: 110;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(20,24,28,0.72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.onboard-card {
+  position: relative; width: 600px; max-width: 92vw;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 44px 40px 30px; box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+}
+.onboard-skip {
+  position: absolute; top: 18px; right: 20px; background: none; color: var(--ink-dim);
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.04em;
+}
+.onboard-skip:hover { color: var(--ink-mid); }
+.onboard-inner { min-height: 340px; display: flex; flex-direction: column; }
+.onboard-visual { height: 190px; display: flex; align-items: center; justify-content: center; margin-bottom: 22px; }
+.onboard-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; color: var(--accent); margin-bottom: 8px; }
+.onboard-copy { text-align: center; flex: 1; }
+.onboard-title { font-size: 21px; font-weight: 600; color: var(--ink); margin: 0 0 12px; }
+.onboard-desc { font-size: 14px; line-height: 1.65; color: var(--ink-mid); max-width: 440px; margin: 0 auto; }
+.onboard-dots { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 26px 0 22px; }
+.onboard-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--border); transition: all 0.25s; }
+.onboard-dot.active { width: 20px; background: var(--accent); }
+.onboard-footer { display: flex; align-items: center; justify-content: space-between; }
+.onboard-back { font-size: 12px; color: var(--ink-dim); padding: 8px 10px; }
+.onboard-back:hover:not(:disabled) { color: var(--ink-mid); }
+.onboard-back:disabled { opacity: 0; pointer-events: none; }
+.onboard-step { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--ink-dim); letter-spacing: 0.06em; }
+.onboard-next { background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 8px; }
+.onboard-next:hover { filter: brightness(1.06); }
+/* mini feature mockups shown in the visual area */
+.onboard-mock { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; max-width: 100%; box-sizing: border-box; }
+.onboard-mock-char { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.onboard-mock-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.onboard-mock-charname { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-mid); }
+.onboard-mock-note { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.onboard-mock-note + .onboard-mock-note { margin-top: 7px; }
+.onboard-mock-note-title { font-size: 13px; color: var(--ink); margin-bottom: 4px; }
+.onboard-mock-note-snippet { font-size: 11px; color: var(--ink-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onboard-mock-monthlabel { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-mid); margin-bottom: 10px; text-align: center; }
+.onboard-cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 5px; }
+.onboard-cal-cell { aspect-ratio: 1; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+.onboard-mock-forecast-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--ink-dim); margin-bottom: 10px; }
+.onboard-bars { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+.onboard-bar { flex: 1; border-radius: 2px; }
+@media (max-width: 560px) {
+  .onboard-card { padding: 34px 20px 24px; }
+  .onboard-title { font-size: 19px; }
+  .onboard-inner { min-height: 320px; }
+}
 .discord-btn {
   display: inline-flex; align-items: center; gap: 10px;
   background: #5865F2; color: #fff; padding: 12px 20px;
@@ -1304,6 +1358,11 @@ kbd {
   </div>
 </div>
 
+<!-- ONBOARDING (first-visit feature tour, shown over the login screen) -->
+<div class="onboard-overlay hidden" id="onboardOverlay">
+  <div class="onboard-card" id="onboardCard"></div>
+</div>
+
 <!-- APP -->
 <div class="app" id="app">
 
@@ -1961,6 +2020,7 @@ kbd {
             <div class="cl-item new">Categories with a bill due this month now show up even before you've budgeted for them, so an unbudgeted commitment isn't hidden.</div>
             <div class="cl-item new">Added a "?" button to Bills and Budget that explains how each one works in plain language, with a worked example. Handy if you've handed someone a Bills account and don't fancy explaining rollover yourself.</div>
             <div class="cl-item new">The "Add" button in the sidebar now matches whichever tab you're on (a note on Notes, a bill on Bills or Budget), with a small ▾ menu to pick the other one. Previously it always said "Add Note" even on the Bills and Budget screens.</div>
+            <div class="cl-item new">First-time visitors now get a short seven-slide tour of the app over the login screen (Notes, Calendar, Bills, Budget, Discord, local accounts). It shows once and can be skipped anytime.</div>
             <div class="cl-item fix">Bills now record what each payment actually cost at the time. Previously "Paid in recent months" valued old payments at the bill's current amount, so raising a bill's price quietly changed your spending history.</div>
           </div>
         </div>
